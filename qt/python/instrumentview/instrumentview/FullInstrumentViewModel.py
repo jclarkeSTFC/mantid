@@ -7,6 +7,7 @@
 from instrumentview.Detectors import DetectorInfo
 import instrumentview.Projections.spherical_projection as iv_spherical
 import instrumentview.Projections.cylindrical_projection as iv_cylindrical
+from mantid.simpleapi import ExtractSpectra, ConvertUnits
 import numpy as np
 import math
 
@@ -19,6 +20,7 @@ class FullInstrumentViewModel:
     _invalid_index = -1
     _data_min = 0.0
     _data_max = 0.0
+    line_plot_workspace = None
 
     def __init__(self, workspace):
         """For the given workspace, calculate detector positions, the map from detector indices to workspace indices, and integrated
@@ -146,3 +148,15 @@ class FullInstrumentViewModel:
         )
         self._detector_projection_positions[:, :2] = projection.positions()  # Assign only x and y coordinate
         return self._detector_projection_positions
+
+    def extract_spectra_for_line_plot(self, unit: str) -> None:
+        workspace_indices = self.picked_workspace_indices()
+        if len(workspace_indices) == 0:
+            self.line_plot_workspace = None
+            return
+
+        ws = ExtractSpectra(InputWorkspace=self._workspace, WorkspaceIndexList=workspace_indices, EnableLogging=False, StoreInADS=False)
+
+        ws = ConvertUnits(InputWorkspace=ws, target=unit, EMode="Elastic", EnableLogging=False, StoreInADS=False)
+
+        self.line_plot_workspace = ws

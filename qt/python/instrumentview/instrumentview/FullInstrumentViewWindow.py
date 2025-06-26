@@ -100,6 +100,12 @@ class FullInstrumentViewWindow(QMainWindow):
         projection_group_box.setLayout(projection_vbox)
         options_vertical_layout.addWidget(projection_group_box)
 
+        units_group_box = QGroupBox("Units")
+        units_vbox = QVBoxLayout()
+        self._setup_units_options(units_vbox)
+        units_group_box.setLayout(units_vbox)
+        options_vertical_layout.addWidget(units_group_box)
+
         options_vertical_layout.addWidget(QSplitter(Qt.Horizontal))
         self._detector_spectrum_fig, self._detector_spectrum_axes = plt.subplots(subplot_kw={"projection": "mantid"})
         self._detector_figure_canvas = FigureCanvas(self._detector_spectrum_fig)
@@ -160,6 +166,22 @@ class FullInstrumentViewWindow(QMainWindow):
         """If the projection type is changed, then tell the presenter to do something"""
         if type(value) is int:
             self._presenter.projection_option_selected(value)
+
+    def _setup_units_options(self, parent: QVBoxLayout):
+        """Add widgets for the units options"""
+        self._units_combo_box = QComboBox(self)
+        self._units_combo_box.setToolTip("Select the units for the spectra line plot")
+        for unit in self._presenter._UNIT_OPTIONS:
+            self._units_combo_box.addItem(unit)
+        self._units_combo_box.currentIndexChanged.connect(self._on_units_combo_box_changed)
+        parent.addWidget(self._units_combo_box)
+
+    def _on_units_combo_box_changed(self, value):
+        self._presenter.unit_option_selected(self._presenter._UNIT_OPTIONS[value])
+
+    def current_selected_unit(self) -> str:
+        """Get the currently selected unit from the combo box"""
+        return self._units_combo_box.currentText()
 
     def _on_multi_select_check_box_clicked(self, state):
         """Tell the presenter if either single or multi select is enabled"""
@@ -299,13 +321,13 @@ class FullInstrumentViewWindow(QMainWindow):
         """Set the camera focal point on the main plotter"""
         self.main_plotter.camera.focal_point = focal_point
 
-    def show_plot_for_detectors(self, workspace, workspace_indices: list) -> None:
+    def show_plot_for_detectors(self, workspace) -> None:
         """Plot all the given spectra, where they are defined by their workspace indices, not the spectra numbers"""
         self._detector_spectrum_axes.clear()
-        for d in workspace_indices:
-            self._detector_spectrum_axes.plot(workspace, label=workspace.name() + "Workspace Index " + str(d), wkspIndex=int(d))
-
-        if len(workspace_indices) > 0:
+        if workspace is not None and workspace.getNumberHistograms() > 0:
+            spectra = workspace.getSpectrumNumbers()
+            for spec in spectra:
+                self._detector_spectrum_axes.plot(workspace, specNum=spec, label=f"Spectrum {spec}")
             self._detector_spectrum_axes.legend(fontsize=8.0).set_draggable(True)
 
         self._detector_figure_canvas.draw()
