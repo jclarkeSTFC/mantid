@@ -24,6 +24,11 @@ class FullInstrumentViewPresenter:
     _CYLINDRICAL_Z = "Cylindrical Z"
     _PROJECTION_OPTIONS = [_SPHERICAL_X, _SPHERICAL_Y, _SPHERICAL_Z, _CYLINDRICAL_X, _CYLINDRICAL_Y, _CYLINDRICAL_Z]
 
+    _TIME_OF_FLIGHT = "TOF"
+    _D_SPACING = "dSpacing"
+    _WAVELENGTH = "Wavelength"
+    _UNIT_OPTIONS = [_TIME_OF_FLIGHT, _D_SPACING, _WAVELENGTH]
+
     def __init__(self, view: FullInstrumentViewWindow, model: FullInstrumentViewModel):
         """For the given workspace, use the data from the model to plot the detectors. Also include points at the origin and
         any monitors."""
@@ -163,7 +168,11 @@ class FullInstrumentViewPresenter:
         self._pickable_main_mesh["visibility"] = self._model.picked_visibility()
         self._pickable_projection_mesh["visibility"] = self._model.picked_visibility()
 
-        self._view.set_plot_for_detectors(self._model.workspace(), self._model.picked_workspace_indices())
+        self._update_line_plot_ws_and_draw(self._view.current_selected_unit())
+
+    def _update_line_plot_ws_and_draw(self, unit: str) -> None:
+        self._model.extract_spectra_for_line_plot(unit)
+        self._view.set_plot_for_detectors(self._model.line_plot_workspace)
         self._view.set_selected_detector_info(self._model.picked_detectors_info_text())
 
     def on_clear_selected_detectors_clicked(self) -> None:
@@ -182,3 +191,6 @@ class FullInstrumentViewPresenter:
         rgba[:, 2] = blue
         rgba[:, 3] = alpha
         return rgba
+
+    def unit_option_selected(self, unit: str) -> None:
+        self._update_line_plot_ws_and_draw(unit)
