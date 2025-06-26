@@ -90,16 +90,18 @@ class TestFullInstrumentViewPresenter(unittest.TestCase):
 
         self._presenter._pickable_main_mesh = {}
         self._presenter._pickable_projection_mesh = {}
-
         self._presenter._model = mock_model
+
+        self._mock_view.current_selected_unit.return_value = "TOF"
 
         self._presenter.update_picked_detectors([])
 
         self.assertEqual(self._presenter._pickable_main_mesh["visibility"], [True, True, False])
         self.assertEqual(self._presenter._pickable_projection_mesh["visibility"], [True, True, False])
 
-        self._mock_view.show_plot_for_detectors.assert_called_once_with(mock_model.workspace(), [0, 1])
+        self._mock_view.show_plot_for_detectors.assert_called_once_with(mock_model.line_plot_workspace)
         self._mock_view.update_selected_detector_info.assert_called_once_with(["a", "a"])
+        mock_model.extract_spectra_for_line_plot.assert_called_once_with("TOF")
 
     def test_generate_single_colour(self):
         green_vector = self._presenter.generateSingleColour([[1, 0, 0], [0, 1, 0]], 0, 1, 0, 0)
@@ -115,3 +117,10 @@ class TestFullInstrumentViewPresenter(unittest.TestCase):
         self._presenter.set_multi_select_enabled(False)
         self._mock_view.enable_rectangle_picking.assert_not_called()
         self._mock_view.enable_point_picking.assert_called_once()
+
+    @mock.patch("instrumentview.FullInstrumentViewModel.FullInstrumentViewModel.extract_spectra_for_line_plot")
+    def test_unit_option_selected(self, mock_extract_spectra):
+        self._presenter.unit_option_selected("Wavelength")
+        self._mock_view.show_plot_for_detectors.assert_called_once()
+        self._mock_view.update_selected_detector_info.assert_called_once()
+        mock_extract_spectra.assert_called_once_with("Wavelength")
