@@ -210,7 +210,10 @@ class FullInstrumentViewWindow(QMainWindow):
 
     def add_main_mesh(self, mesh: PolyData, scalars=None, clim=None) -> None:
         """Draw the given mesh in the main plotter window"""
-        self.main_plotter.add_mesh(mesh, pickable=False, scalars=scalars, clim=clim, render_points_as_spheres=True, point_size=14)
+        scalar_bar_args = dict(interactive=True, vertical=True) if scalars is not None else None
+        self.main_plotter.add_mesh(
+            mesh, pickable=False, scalars=scalars, clim=clim, render_points_as_spheres=True, point_size=14, scalar_bar_args=scalar_bar_args
+        )
 
     def add_pickable_main_mesh(self, point_cloud: PolyData, scalars: np.ndarray | str) -> None:
         self.main_plotter.add_mesh(
@@ -264,7 +267,10 @@ class FullInstrumentViewWindow(QMainWindow):
     def add_projection_mesh(self, mesh: PolyData, scalars=None, clim=None) -> None:
         """Draw the given mesh in the projection plotter. This is a 2D plot so we set options accordingly on the plotter"""
         self.projection_plotter.clear()
-        self.projection_plotter.add_mesh(mesh, scalars=scalars, clim=clim, render_points_as_spheres=True, point_size=14, pickable=False)
+        scalar_bar_args = dict(interactive=True, vertical=True) if scalars is not None else None
+        self.projection_plotter.add_mesh(
+            mesh, scalars=scalars, clim=clim, render_points_as_spheres=True, point_size=14, pickable=False, scalar_bar_args=scalar_bar_args
+        )
         self.projection_plotter.view_xy()
         if not self.projection_plotter.off_screen:
             self.projection_plotter.enable_zoom_style()
