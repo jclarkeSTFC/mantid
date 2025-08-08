@@ -44,7 +44,7 @@ requirements:
     - matplotlib {{ matplotlib }}
     - python.app  # [osx]
     - pystack  # [linux]
-    - pyvista
+    - pyvista {{ pyvista }}
     - pyvistaqt
     - qtconsole {{ qtconsole }}
     - {{ pin_compatible("setuptools", max_pin="x.x") }}

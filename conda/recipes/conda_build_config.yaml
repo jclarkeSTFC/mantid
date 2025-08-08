@@ -89,6 +89,9 @@ psutil:
 pydantic:
  - '>=2.11.4,<3'
 
+pyvista:
+  - '<0.46'
+
 sphinx:
   - '>=4.5.*'
 
