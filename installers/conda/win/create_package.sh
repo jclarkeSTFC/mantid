@@ -80,12 +80,21 @@ if [[ "$SUFFIX" == "Unstable" ]] || [[ "$SUFFIX" == "Nightly" ]]; then
   MANTID_CHANNEL=mantid/label/nightly
 fi
 
+echo "Ensuring PREFIX variable is set for package install scripts"
+if [ -z "$PREFIX" ]; then
+    echo "PREFIX was not set. CONDA_ENV_PATH is $CONDA_ENV_PATH"
+    WIN_PREFIX=$CONDA_ENV_PATH
+else
+    echo "PREFIX is already set to: $PREFIX"
+    WIN_PREFIX=$PREFIX
+fi
+
+echo "Converting WIN_PREFIX from POSIX-style to Windows-style"
+WIN_PREFIX=$(cygpath -w $WIN_PREFIX)
+WIN_CONDA_ENV_PATH=$(cygpath -w $CONDA_ENV_PATH)
+
 echo "Creating conda env from mantidworkbench and jq"
-"$CONDA_EXE" create --prefix $CONDA_ENV_PATH \
-  --copy --channel $CONDA_CHANNEL --channel conda-forge --channel $MANTID_CHANNEL -y \
-  mantidworkbench \
-  mslice \
-  m2w64-jq
+cmd.exe /C "set PREFIX=$WIN_PREFIX && $CONDA_EXE create --prefix $WIN_CONDA_ENV_PATH --copy --channel $CONDA_CHANNEL --channel conda-forge --channel $MANTID_CHANNEL -y mantidworkbench mslice m2w64-jq"
 echo "Conda env created"
 
 # Determine version information
