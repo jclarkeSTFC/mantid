@@ -89,12 +89,16 @@ else
     WIN_PREFIX=$PREFIX
 fi
 
-echo "Converting WIN_PREFIX from POSIX-style to Windows-style"
+echo "Converting paths from POSIX-style to Windows-style"
 WIN_PREFIX=$(cygpath -w $WIN_PREFIX)
 WIN_CONDA_ENV_PATH=$(cygpath -w $CONDA_ENV_PATH)
+WIN_CONDA_CHANNEL=$(cygpath -w $CONDA_CHANNEL)
+echo "WIN_PREFIX is $WIN_PREFIX"
+echo "WIN_CONDA_ENV_PATH is $WIN_CONDA_ENV_PATH"
+echo "WIN_CONDA_CHANNEL is $WIN_CONDA_CHANNEL"
 
 echo "Creating conda env from mantidworkbench and jq"
-cmd.exe /C "set PREFIX=$WIN_PREFIX && $CONDA_EXE create --prefix $WIN_CONDA_ENV_PATH --copy --channel $CONDA_CHANNEL --channel conda-forge --channel $MANTID_CHANNEL -y mantidworkbench mslice m2w64-jq"
+cmd.exe /C "set PREFIX=$WIN_PREFIX && $CONDA_EXE create --prefix $WIN_CONDA_ENV_PATH --copy --channel $WIN_CONDA_CHANNEL --channel conda-forge --channel $MANTID_CHANNEL -y mantidworkbench mslice m2w64-jq"
 echo "Conda env created"
 
 # Determine version information
