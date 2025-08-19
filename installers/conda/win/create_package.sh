@@ -80,13 +80,20 @@ if [[ "$SUFFIX" == "Unstable" ]] || [[ "$SUFFIX" == "Nightly" ]]; then
   MANTID_CHANNEL=mantid/label/nightly
 fi
 
+# Create and activate the conda environment in separate steps to ensure PREFIX is set
 echo "Creating conda env from mantidworkbench and jq"
-"$CONDA_EXE" create --prefix $CONDA_ENV_PATH \
+"$CONDA_EXE" create --prefix $CONDA_ENV_PATH
+echo "Activating the conda env"
+"$CONDA_EXE" activate $CONDA_ENV_PATH
+echo "Installing packages"
+"$CONDA_EXE" install --prefix $CONDA_ENV_PATH \
   --copy --channel $CONDA_CHANNEL --channel conda-forge --channel $MANTID_CHANNEL -y \
   mantidworkbench \
   mslice \
   m2w64-jq
 echo "Conda env created"
+"$CONDA_EXE" deactivate
+echo "Conda env deactivated"
 
 # Determine version information
 VERSION=$("$CONDA_EXE" list --prefix "$CONDA_ENV_PATH" '^mantid$' --json | $CONDA_ENV_PATH/Library/mingw-w64/bin/jq.exe --raw-output '.[0].version')
