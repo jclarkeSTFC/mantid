@@ -85,7 +85,7 @@ fi
 
 if [[ $OSTYPE == 'msys'* ]]; then
     rm -fr *.exe
-    ${PACKAGING_SCRIPTS_DIR}/win/create_package.sh $PACKAGING_ARGS
+    ${PACKAGING_SCRIPTS_DIR}/win/create_package.sh $PACKAGING_ARGS --miniforge-path "${WORKSPACE}/miniforge"
 elif [[ $OSTYPE == 'darwin'* ]]; then
     rm -fr *.dmg
     if [ -n "${PLATFORM}" ]; then

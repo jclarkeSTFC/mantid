@@ -13,6 +13,7 @@ function usage() {
   echo "Create a standalone installable package out of a mantidworkbench conda package."
   echo "Requires mamba to be installed in the running environment, and on the path."
   echo "Options:"
+  echo "  --miniforge-path Required Pass the installation path of miniforge"
   echo "  -c Optional conda channel overriding the default mantid"
   echo "  -s Optional Add a suffix to the output mantid file, has to be Unstable, or Nightly or not used"
   echo
@@ -27,6 +28,10 @@ SUFFIX=""
 while [ ! $# -eq 0 ]
 do
     case "$1" in
+        --miniforge-path)
+            MINIFORGE_PATH="$2"
+            shift
+            ;;
         -c)
             CONDA_CHANNEL="$2"
             shift
@@ -47,6 +52,12 @@ do
   esac
   shift
 done
+
+# If miniforge path is not passed in then fail.
+if [ -z "$MINIFORGE_PATH" ]; then
+    echo "--miniforge-path must be specified."
+    exit 1
+fi
 
 # If suffix is not empty and does not contain Unstable or Nightly then fail.
 if [ ! -z "$SUFFIX" ]; then
@@ -80,11 +91,13 @@ if [[ "$SUFFIX" == "Unstable" ]] || [[ "$SUFFIX" == "Nightly" ]]; then
   MANTID_CHANNEL=mantid/label/nightly
 fi
 
+echo "Initialise mamba and conda in this shell"
+source $MINIFORGE_PATH/etc/profile.d/conda.sh
+source $MINIFORGE_PATH/etc/profile.d/mamba.sh
 # Create and activate the conda environment in separate steps to ensure PREFIX is set
 echo "Creating conda env from mantidworkbench and jq"
 "$CONDA_EXE" create --prefix $CONDA_ENV_PATH
 echo "Activating the conda env"
-eval "$("$CONDA_EXE" shell.bash hook)"
 "$CONDA_EXE" activate $CONDA_ENV_PATH
 echo "Installing packages"
 "$CONDA_EXE" install --prefix $CONDA_ENV_PATH \
