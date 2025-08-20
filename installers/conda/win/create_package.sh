@@ -98,6 +98,7 @@ source $MINIFORGE_PATH/etc/profile.d/mamba.sh
 echo "Creating conda env from mantidworkbench and jq"
 "$CONDA_EXE" create --prefix $CONDA_ENV_PATH
 echo "Activating the conda env"
+"$CONDA_EXE" init
 "$CONDA_EXE" activate $CONDA_ENV_PATH
 echo "Installing packages"
 "$CONDA_EXE" install --prefix $CONDA_ENV_PATH \
