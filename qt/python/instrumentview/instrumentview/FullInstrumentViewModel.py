@@ -9,6 +9,7 @@ import instrumentview.Projections.SphericalProjection as iv_spherical
 import instrumentview.Projections.CylindricalProjection as iv_cylindrical
 
 from mantid.dataobjects import Workspace2D
+from mantid.simpleapi import CreateDetectorTable
 import numpy as np
 import math
 
@@ -33,24 +34,30 @@ class FullInstrumentViewModel:
         self._sample_position = np.array(self._component_info.samplePosition()) if self._component_info.hasSample() else np.zeros(3)
         has_source = self._workspace.getInstrument().getSource() is not None
         self._source_position = np.array(self._component_info.sourcePosition()) if has_source else np.array([0, 0, 0])
-        self._detector_ids = np.array(self._detector_info.detectorIDs())
-        self._detector_positions = np.array([self._detector_info.position(i) for i in range(len(self._detector_ids))])
-        self._spherical_positions = np.array([self._detector_info.position(i).getSpherical() for i in range(len(self._detector_ids))])
+
+        detector_info_table = CreateDetectorTable(self._workspace, IncludeDetectorPosition=True, StoreInADS=False)
+
+        # Might have comma-separated multiple detectors, choose first one in the string in that case
+        first_numbers = np.char.split(detector_info_table.column("Detector ID(s)"), sep=",")
+        self._detector_ids = np.array([int(x[0]) for x in first_numbers])
+
+        detector_positions = detector_info_table.column("Position")
+        self._spherical_positions = np.array([pos.getSpherical() for pos in detector_positions])
+        self._detector_positions = np.array(detector_positions)
+
         self._counts = np.zeros_like(self._detector_ids)
-        workspace_map = self._workspace.getDetectorIDToWorkspaceIndexMap(False, False)
-        self._workspace_indices = np.array([workspace_map.get(int(i), -1) for i in self._detector_ids])
-        self._is_valid = np.array(
-            [not self._detector_info.isMonitor(i) and self._workspace_indices[i] != -1 for i in range(len(self._detector_ids))]
-        )
+        self._workspace_indices = np.array(detector_info_table.column("Index")).astype(int)
+
+        self._is_monitor = np.array(detector_info_table.column("Monitor"))
+        spectrum_number = np.array(detector_info_table.column("Spectrum No"))
+        self._is_valid = (self._is_monitor == "no") & (spectrum_number != -1)
+        self._monitor_positions = self._detector_positions[self._is_monitor == "yes"]
         self._detector_projection_positions = np.zeros_like(self._detector_positions)
         self._detector_is_picked = np.full(len(self._detector_ids[self._is_valid]), False)
 
-        self._bin_min = math.inf
-        self._bin_max = -math.inf
-        for workspace_index in range(self._workspace.getNumberHistograms()):
-            x_data = self._workspace.dataX(workspace_index)
-            self._union_with_current_bin_min_max(x_data[0])
-            self._union_with_current_bin_min_max(x_data[-1])
+        data_x = self._workspace.extractX()
+        self._bin_min = np.min(data_x[:, 0])
+        self._bin_max = np.max(data_x[:, -1])
 
         self.update_time_of_flight_range(self._bin_min, self._bin_max, True)
 
@@ -117,7 +124,9 @@ class FullInstrumentViewModel:
         return [self._bin_min, self._bin_max]
 
     def monitor_positions(self) -> np.ndarray:
-        return self._detector_positions[[self._detector_info.isMonitor(i) for i in range(len(self._detector_ids))]]
+        return self._monitor_positions
+        # return self._detector_positions[self._is_monitor == 'yes']
+        # return self._detector_positions[[self._detector_info.isMonitor(i) for i in range(len(self._detector_ids))]]
 
     def picked_detectors_info_text(self) -> list[DetectorInfo]:
         """For the specified detector, extract info that can be displayed in the View, and wrap it all up in a DetectorInfo class"""
