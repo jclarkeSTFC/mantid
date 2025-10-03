@@ -8,6 +8,7 @@ import numpy as np
 import pyvista as pv
 from pyvista.plotting.picking import RectangleSelection
 from pyvista.plotting.opts import PickerType
+import matplotlib.colors as mpb_colors
 from mantid import mtd
 from mantid.kernel import logger
 
@@ -128,6 +129,14 @@ class FullInstrumentViewPresenter:
             self._update_view_main_plotter(self._model.detector_positions, is_projection=False)
             return
 
+        projected_points = self._adjust_points_for_selected_projection(self._model.detector_positions, projection_type)
+        self._view.disable_rectangle_picking_checkbox()
+        self._update_view_main_plotter(projected_points, is_projection=True)
+
+    def _adjust_points_for_selected_projection(self, points: np.ndarray, projection_type: str) -> np.ndarray:
+        if projection_type.startswith("3D"):
+            return points
+
         is_spherical = True
         if projection_type.startswith("Spherical"):
             is_spherical = True
@@ -145,9 +154,7 @@ class FullInstrumentViewPresenter:
         else:
             raise ValueError(f"Unknown projection type {projection_type}")
 
-        self._model.calculate_projection(is_spherical, axis)
-        self._view.disable_rectangle_picking_checkbox()
-        self._update_view_main_plotter(self._model.detector_projection_positions, is_projection=True)
+        return self._model.calculate_projection(is_spherical, axis, points)
 
     def _update_view_main_plotter(self, positions: np.ndarray, is_projection: bool):
         self._detector_mesh = self.create_poly_data_mesh(positions)
@@ -244,3 +251,23 @@ class FullInstrumentViewPresenter:
 
     def on_unit_option_selected(self, value) -> None:
         self._update_line_plot_ws_and_draw(self._UNIT_OPTIONS[value])
+
+    def peaks_workspaces_in_ads(self) -> list[str]:
+        return [ws.name() for ws in self._model.peaks_workspaces_in_ads()]
+
+    def _create_mesh_from_peak_points(self, points: np.ndarray, colour: str) -> pv.PolyData:
+        r, g, b, a = mpb_colors.to_rgba(colour)
+        colours = self.generate_single_colour(len(points), r, g, b, a)
+        mesh = self.create_poly_data_mesh(points)
+        mesh["colours"] = colours
+        return mesh
+
+    def on_peaks_workspace_selected(self) -> None:
+        self._model.set_peaks_workspaces(self._view.selected_peaks_workspaces())
+        self._view.clear_overlay_meshes()
+        peak_positions = self._model.peak_overlay_points()
+        if len(peak_positions) == 0:
+            return
+        projected_points = self._adjust_points_for_selected_projection(peak_positions, self._view.current_selected_projection())
+        mesh = self._create_mesh_from_peak_points(projected_points, "c")
+        self._view.plot_overlay_meshes([mesh])
