@@ -5,12 +5,13 @@ permissions:
   pull-requests: write
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: 0 6 * * *
+  push:
+    branches:
+      - 'test_reduce_fork_build'
 
 jobs:
   pixi-update-lockfile:
+    if: ${{ github.repository_owner == 'mantidproject' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -30,7 +31,9 @@ jobs:
           title: Update pixi lockfile
           body-path: diff.md
           branch: update-pixi
-          base: main  # change this to the default branch of your repository
-          labels: pixi
+          base: test_reduce_fork_build  # change this to the default branch of your repository
+          labels: |
+            pixi
+            Maintenanance
           delete-branch: true
           add-paths: pixi.lock
