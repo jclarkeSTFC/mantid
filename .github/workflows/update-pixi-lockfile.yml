@@ -5,9 +5,9 @@ permissions:
   pull-requests: write
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: 0 6 * * *
+  push:
+    branches:
+      - 'test_reduce_fork_build'
 
 jobs:
   pixi-update-lockfile:
