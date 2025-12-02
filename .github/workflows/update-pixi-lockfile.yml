@@ -31,7 +31,7 @@ jobs:
           title: Update pixi lockfile
           body-path: diff.md
           branch: update-pixi
-          base: main  # change this to the default branch of your repository
+          base: test_reduce_fork_build  # change this to the default branch of your repository
           labels: |
             pixi
             Maintenanance
