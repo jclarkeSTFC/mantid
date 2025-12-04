@@ -70,6 +70,8 @@ class FullInstrumentViewPresenter:
             add_callback=self.add_workspace_callback,
         )
         self._view.hide_status_box()
+        self._is_adding_peak = False
+        self._update_add_peak_button()
 
     # TODO: Sort out view names and return names all in one place
     def projection_combo_options(self) -> tuple[int, list[str]]:
@@ -221,6 +223,8 @@ class FullInstrumentViewPresenter:
         if self._view.is_multi_picking_checkbox_checked():
             self._view.check_sum_spectra_checkbox()
             self._view.enable_rectangle_picking(self._is_projection_selected, callback=self.rectangle_picked)
+            self._is_adding_peak = False
+            self._update_add_peak_button()
         else:
             self._view.enable_point_picking(self._is_projection_selected, callback=self.point_picked)
 
@@ -247,6 +251,7 @@ class FullInstrumentViewPresenter:
         self._pickable_main_mesh[self._visible_label] = self._model.picked_visibility
 
         self._update_line_plot_ws_and_draw(self._view.current_selected_unit())
+        self._update_add_peak_button()
 
     def _update_line_plot_ws_and_draw(self, unit: str) -> None:
         self._model.extract_spectra_for_line_plot(unit, self._view.sum_spectra_selected())
@@ -381,3 +386,20 @@ class FullInstrumentViewPresenter:
             if len(x_values) > 0:
                 self._view.plot_lineplot_overlay(x_values, labels, ws_peaks.colour)
         self._view.redraw_lineplot()
+
+    def on_add_peak_clicked(self) -> None:
+        self._is_adding_peak = True
+        self._view.add_peak_cursor_to_lineplot()
+
+    def on_peak_selected(self, x: float) -> None:
+        peaks_ws = self._model.add_peak(x, self._view.selected_peaks_workspaces())
+        self._is_adding_peak = False
+        self._view.set_add_peak_button_enabled(len(self._model.picked_detector_ids) == 1)
+        self._view.remove_peak_cursor_from_lineplot()
+        self._view.select_peaks_workspace(peaks_ws)
+
+    def _update_add_peak_button(self) -> None:
+        self._view.set_add_peak_button_enabled(len(self._model.picked_detector_ids) == 1 and not self._is_adding_peak)
+
+    def select_peaks_workspace_if_not_already(self, peaks_ws: str) -> None:
+        self._view.select_peaks_workspace(peaks_ws)

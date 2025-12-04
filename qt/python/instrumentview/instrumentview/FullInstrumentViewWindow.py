@@ -30,6 +30,7 @@ from superqt import QDoubleRangeSlider
 from pyvistaqt import BackgroundPlotter
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.widgets import Cursor
 from instrumentview.Detectors import DetectorInfo
 from instrumentview.InteractorStyles import CustomInteractorStyleZoomAndSelect, CustomInteractorStyleRubberBand3D
 from typing import Callable
@@ -116,6 +117,7 @@ class FullInstrumentViewWindow(QMainWindow):
         plot_layout = QVBoxLayout(plot_widget)
         plot_layout.addWidget(self._detector_figure_canvas)
         plot_layout.addWidget(plot_toolbar)
+        self._lineplot_peak_cursor = None
 
         vsplitter = QSplitter(Qt.Vertical)
         vsplitter.addWidget(self.main_plotter.app_window)
@@ -177,8 +179,12 @@ class FullInstrumentViewWindow(QMainWindow):
 
         peak_ws_group_box = QGroupBox("Peaks Workspaces")
         peak_v_layout = QVBoxLayout(peak_ws_group_box)
+        peak_buttons_h_layout = QHBoxLayout()
+        self._add_peak_button = QPushButton("Add Peak")
         self._peak_ws_list = PeaksWorkspaceListWidget(self)
         self._peak_ws_list.setSizeAdjustPolicy(QListWidget.AdjustToContents)
+        peak_buttons_h_layout.addWidget(self._add_peak_button)
+        peak_v_layout.addLayout(peak_buttons_h_layout)
         peak_v_layout.addWidget(self._peak_ws_list)
 
         self.status_group_box = QGroupBox("Status")
@@ -350,6 +356,7 @@ class FullInstrumentViewWindow(QMainWindow):
         self._sum_spectra_checkbox.clicked.connect(self._presenter.on_sum_spectra_checkbox_clicked)
         self._peak_ws_list.itemChanged.connect(self._presenter.on_peaks_workspace_selected)
         self._aspect_ratio_check_box.clicked.connect(self._presenter.on_aspect_ratio_check_box_clicked)
+        self._add_peak_button.clicked.connect(self._presenter.on_add_peak_clicked)
 
         self._add_connections_to_edits_and_slider(
             self._contour_range_min_edit,
@@ -411,6 +418,16 @@ class FullInstrumentViewWindow(QMainWindow):
                 picked_index += 1
             else:
                 list_item.setForeground(self._peak_ws_list.palette().color(QPalette.Text))
+
+    def select_peaks_workspace(self, peaks_ws: str) -> None:
+        for list_i in range(self._peak_ws_list.count()):
+            list_item = self._peak_ws_list.item(list_i)
+            if list_item.text() == peaks_ws:
+                list_item.setCheckState(Qt.Checked)
+                return
+
+    def set_add_peak_button_enabled(self, is_enabled: bool) -> None:
+        self._add_peak_button.setEnabled(is_enabled)
 
     def set_unit_combo_box_index(self, index: int) -> None:
         self._units_combo_box.setCurrentIndex(index)
@@ -648,3 +665,20 @@ class FullInstrumentViewWindow(QMainWindow):
     def redraw_lineplot(self) -> None:
         self._detector_spectrum_fig.tight_layout()
         self._detector_figure_canvas.draw()
+
+    def _on_axes_click(self, event) -> None:
+        if event.inaxes is not self._detector_spectrum_axes or event.xdata is None:
+            return
+        self._presenter.on_peak_selected(event.xdata)
+
+    def add_peak_cursor_to_lineplot(self) -> None:
+        self._lineplot_peak_cursor = Cursor(self._detector_spectrum_axes, color="tab:red", linewidth=1, horizOn=False)
+        self._figure_canvas_click_id = self._detector_figure_canvas.mpl_connect("button_press_event", self._on_axes_click)
+
+    def remove_peak_cursor_from_lineplot(self) -> None:
+        if self._lineplot_peak_cursor is not None:
+            self._detector_figure_canvas.mpl_disconnect(self._figure_canvas_click_id)
+            self._figure_canvas_click_id = None
+            self._lineplot_peak_cursor.linev.remove()
+            self._lineplot_peak_cursor = None
+            self._detector_figure_canvas.draw_idle()
