@@ -68,6 +68,8 @@ class FullInstrumentViewPresenter:
         self._transform = np.eye(4)
         self._counts_label = "Integrated Counts"
         self._visible_label = "Visible Picked"
+        self._single_pixel_mode = False
+        self._last_hovered_workspace_index: Optional[int] = None
         self._model.setup()
         self.setup()
         self._callback_queue = Queue()
@@ -185,8 +187,15 @@ class FullInstrumentViewPresenter:
     def update_plotter(self) -> None:
         """Update the projection based on the selected option."""
         self._model.projection_type = self._view.current_selected_projection()
+        if not self._model.is_2d_projection and self._single_pixel_mode:
+            self._single_pixel_mode = False
+            self._last_hovered_workspace_index = None
+            self._view.set_select_single_pixel_checked(False)
+        self._view.set_select_single_pixel_available(self._model.is_2d_projection)
+        self._view.set_single_pixel_mode_enabled(self._single_pixel_mode)
         with SuppressRendering(self._view.main_plotter):
             self._update_view_main_plotter()
+            self._view.set_single_pixel_mode_enabled(self._single_pixel_mode)
             self.update_detector_picker()
             self.on_peaks_workspace_selected()
 
@@ -280,6 +289,21 @@ class FullInstrumentViewPresenter:
     def update_detector_picker(self) -> None:
         """Change between single and multi point picking"""
 
+        if self._single_pixel_mode:
+
+            def point_hovered(point_index: int | None) -> None:
+                if point_index is None:
+                    return
+                workspace_index = self._model.workspace_index_from_pickable_index(point_index)
+                if workspace_index is None or workspace_index == self._last_hovered_workspace_index:
+                    return
+
+                self._last_hovered_workspace_index = workspace_index
+                self._update_single_pixel_plot(workspace_index)
+
+            self._view.enable_hover_point_picking(callback=point_hovered)
+            return
+
         def point_picked(point_position: np.ndarray | None, picker: PickerType.POINT.value) -> None:
             if point_position is None:
                 return
@@ -288,6 +312,45 @@ class FullInstrumentViewPresenter:
             self.update_picked_detectors_on_view()
 
         self._view.enable_point_picking(self._model.is_2d_projection, callback=point_picked)
+
+    def on_select_single_pixel_toggled(self, checked: bool) -> None:
+        enabled = checked and self._model.is_2d_projection
+        self._single_pixel_mode = enabled
+        self._last_hovered_workspace_index = None
+
+        self._view.set_single_pixel_mode_enabled(enabled)
+        self.update_detector_picker()
+
+        if enabled:
+            self._view.clear_lineplot_overlays()
+            self._view.show_plot_for_detectors(None)
+            self._view.set_selected_detector_info([])
+            self._view.set_relative_detector_angle(None)
+            self._view.remove_peak_cursor_from_lineplot()
+            self._peak_interaction_status = PeakInteractionStatus.Disabled
+            self._update_peak_buttons()
+            return
+
+        self.update_picked_detectors_on_view()
+
+    def _update_single_pixel_plot(self, workspace_index: int) -> None:
+        unit = self._view.current_selected_unit()
+        spectrum = self._model.single_spectrum_for_workspace_index(workspace_index, unit)
+        if spectrum is None:
+            return
+
+        x_values, y_values = spectrum
+        detector_info = self._model.detector_info_text_for_workspace_index(workspace_index)
+        if len(detector_info) == 0:
+            return
+
+        detector = detector_info[0]
+        line_label = f"Spectrum {detector.workspace_index} (Det {detector.detector_id})"
+        self._view.show_single_detector_spectrum(x_values, y_values, line_label, unit)
+        self._view.set_selected_detector_info(detector_info)
+        self._view.set_relative_detector_angle(None)
+        self._peak_interaction_status = PeakInteractionStatus.Disabled
+        self._update_peak_buttons()
 
     def update_picked_detectors_on_view(self) -> None:
         # Update to visibility shows up in real time
@@ -407,6 +470,11 @@ class FullInstrumentViewPresenter:
         return self._model.cached_keys(kind)
 
     def _update_line_plot_ws_and_draw(self, unit: str) -> None:
+        if self._single_pixel_mode:
+            if self._last_hovered_workspace_index is not None:
+                self._update_single_pixel_plot(self._last_hovered_workspace_index)
+            return
+
         self._model.extract_spectra_for_line_plot(unit, self._view.sum_spectra_selected())
         self._view.show_plot_for_detectors(self._model.line_plot_workspace)
         self._view.set_selected_detector_info(self._model.picked_detectors_info_text())

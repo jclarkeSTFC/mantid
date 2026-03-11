@@ -44,6 +44,9 @@ class TestFullInstrumentViewWindow(unittest.TestCase):
     def test_figure_canvas_created(self):
         self._mock_figure_canvas.assert_called_once()
 
+    def test_select_single_pixel_button_is_checkable(self):
+        self.assertTrue(self._view._select_single_pixel.isCheckable())
+
     def test_update_scalar_range(self):
         self._view.set_plotter_scalar_bar_range((0, 100), "label")
         self._view.main_plotter.update_scalar_bar_range.assert_has_calls([mock.call((0, 100), "label")])
@@ -112,7 +115,9 @@ class TestFullInstrumentViewWindow(unittest.TestCase):
         self._view.main_plotter.off_screen = False
         mock_callback = MagicMock()
         self._view.interactor_style = MagicMock()
+        self._view.disable_hover_point_picking = MagicMock()
         self._view.enable_point_picking(False, mock_callback)
+        self._view.disable_hover_point_picking.assert_called_once()
         self._view.interactor_style.remove_interactor.assert_called_once()
         self._view.main_plotter.disable_picking.assert_called_once()
         self._view.main_plotter.enable_surface_point_picking.assert_called_once_with(
@@ -130,10 +135,24 @@ class TestFullInstrumentViewWindow(unittest.TestCase):
         self._view.main_plotter.off_screen = True
         mock_callback = MagicMock()
         self._view.interactor_style = MagicMock()
+        self._view.disable_hover_point_picking = MagicMock()
         self._view.enable_point_picking(False, mock_callback)
         self._view.main_plotter.disable_picking.assert_called_once()
+        self._view.disable_hover_point_picking.assert_called_once()
         self._view.interactor_style.remove_interactor.assert_called_once()
         self._view.main_plotter.enable_surface_point_picking.assert_not_called()
+
+    def test_show_single_detector_spectrum_updates_line_in_place(self):
+        self._view._detector_spectrum_axes = MagicMock()
+        mock_line = MagicMock()
+        self._view._detector_spectrum_axes.plot.return_value = [mock_line]
+        self._view.redraw_lineplot = MagicMock()
+
+        self._view.show_single_detector_spectrum(np.array([1.0, 2.0]), np.array([3.0, 4.0]), "Spectrum", "TOF")
+        self._view.show_single_detector_spectrum(np.array([5.0, 6.0]), np.array([7.0, 8.0]), "Spectrum", "TOF")
+
+        self._view._detector_spectrum_axes.clear.assert_called_once()
+        mock_line.set_data.assert_called_once()
 
     @mock.patch("instrumentview.FullInstrumentViewWindow.CustomInteractorStyleRubberBand3D")
     def test_enable_rectangle_picking_3d(self, mock_style_3d):

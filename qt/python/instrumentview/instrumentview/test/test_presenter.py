@@ -92,6 +92,42 @@ class TestFullInstrumentViewPresenter(unittest.TestCase):
         self._presenter.update_detector_picker()
         self._mock_view.enable_point_picking.assert_called_once()
 
+    def test_update_detector_picker_single_pixel_deduplicates_hover(self):
+        self._presenter._single_pixel_mode = True
+        self._presenter._model.workspace_index_from_pickable_index = MagicMock(return_value=7)
+        self._presenter._update_single_pixel_plot = MagicMock()
+
+        self._presenter.update_detector_picker()
+
+        hover_callback = self._mock_view.enable_hover_point_picking.call_args.kwargs["callback"]
+        hover_callback(3)
+        hover_callback(3)
+
+        self._presenter._update_single_pixel_plot.assert_called_once_with(7)
+
+    def test_on_select_single_pixel_toggled_enables_hover_mode(self):
+        self._model.projection_type = ProjectionType.CYLINDRICAL_X
+        self._presenter.update_detector_picker = MagicMock()
+
+        self._presenter.on_select_single_pixel_toggled(True)
+
+        self.assertTrue(self._presenter._single_pixel_mode)
+        self._mock_view.set_single_pixel_mode_enabled.assert_called_once_with(True)
+        self._presenter.update_detector_picker.assert_called_once()
+        self._mock_view.show_plot_for_detectors.assert_called_once_with(None)
+
+    def test_on_select_single_pixel_toggled_off_restores_regular_plotting(self):
+        self._presenter._single_pixel_mode = True
+        self._presenter.update_detector_picker = MagicMock()
+        self._presenter.update_picked_detectors_on_view = MagicMock()
+
+        self._presenter.on_select_single_pixel_toggled(False)
+
+        self.assertFalse(self._presenter._single_pixel_mode)
+        self._mock_view.set_single_pixel_mode_enabled.assert_called_once_with(False)
+        self._presenter.update_detector_picker.assert_called_once()
+        self._presenter.update_picked_detectors_on_view.assert_called_once()
+
     @mock.patch("instrumentview.FullInstrumentViewModel.FullInstrumentViewModel.extract_spectra_for_line_plot")
     def test_unit_option_selected(self, mock_extract_spectra):
         self._mock_view.sum_spectra_selected.return_value = True

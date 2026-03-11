@@ -107,6 +107,7 @@ class FullInstrumentViewModel:
 
         self._cached_masks_map = {}
         self._cached_rois_map = {}
+        self._hover_spectrum_cache: dict[tuple[int, str], tuple[np.ndarray, np.ndarray]] = {}
 
         self._calculate_and_set_full_integration_range(self._is_valid)
 
@@ -244,10 +245,68 @@ class FullInstrumentViewModel:
 
     def update_point_picked_detectors(self, index: int) -> None:
         # TODO: Check which selection is quicker, mask or indices
-        # NOTE: This is slightly awkard because cannot do chained mask selections
-        global_index = np.argwhere(self.is_pickable)[index]
+        # NOTE: This is slightly awkward because cannot do chained mask selections
+        global_index = self.global_index_from_pickable_index(index)
+        if global_index is None:
+            return
         self._detector_is_picked[global_index] = ~self._detector_is_picked[global_index]
         self._point_picked_detectors[global_index] = self._detector_is_picked[global_index]
+
+    def global_index_from_pickable_index(self, pickable_index: int) -> int | None:
+        global_indices = np.flatnonzero(self.is_pickable)
+        if pickable_index < 0 or pickable_index >= len(global_indices):
+            return None
+        return int(global_indices[pickable_index])
+
+    def workspace_index_from_pickable_index(self, pickable_index: int) -> int | None:
+        global_index = self.global_index_from_pickable_index(pickable_index)
+        if global_index is None:
+            return None
+        return int(self._workspace_indices[global_index])
+
+    def detector_info_text_for_workspace_index(self, workspace_index: int) -> list[DetectorInfo]:
+        matching_indices = np.argwhere(self._workspace_indices == workspace_index)
+        if len(matching_indices) == 0:
+            return []
+
+        index = int(matching_indices[0, 0])
+        ws_detector = self._workspace.getDetector(int(workspace_index))
+        return [
+            DetectorInfo(
+                ws_detector.getName(),
+                self._detector_ids[index],
+                self._workspace_indices[index],
+                self._detector_positions_3d[index],
+                self._spherical_positions[index],
+                ws_detector.getFullName(),
+                int(self._counts[index]),
+            )
+        ]
+
+    def single_spectrum_for_workspace_index(self, workspace_index: int, unit: str) -> tuple[np.ndarray, np.ndarray] | None:
+        cache_key = (int(workspace_index), unit)
+        if cache_key in self._hover_spectrum_cache:
+            return self._hover_spectrum_cache[cache_key]
+
+        if workspace_index < 0 or workspace_index >= self._workspace.getNumberHistograms():
+            return None
+
+        x_values = np.array(self._workspace.readX(int(workspace_index)), dtype=float)
+        y_values = np.array(self._workspace.readY(int(workspace_index)), dtype=float)
+
+        # Histogram workspaces provide bin-edge X values with length len(Y) + 1.
+        # Matplotlib line plotting needs matching lengths, so use bin centres.
+        if len(x_values) == len(y_values) + 1:
+            x_values = 0.5 * (x_values[:-1] + x_values[1:])
+
+        if self.has_unit and unit != self.workspace_x_unit:
+            x_values = np.array(
+                [self.convert_units(self.workspace_x_unit, unit, 0, float(x)) for x in x_values],
+                dtype=float,
+            )
+
+        self._hover_spectrum_cache[cache_key] = (x_values, y_values)
+        return self._hover_spectrum_cache[cache_key]
 
     def clear_point_picked_detectors(self) -> None:
         self._detector_is_picked[self._point_picked_detectors] = False

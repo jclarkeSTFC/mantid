@@ -36,6 +36,7 @@ from matplotlib.widgets import Cursor
 from pyvista.plotting.picking import RectangleSelection
 from pyvista.plotting.opts import PickerType
 from vtkmodules.vtkCommonDataModel import vtkBox, vtkCylinder, vtkImplicitFunction
+from vtkmodules.vtkRenderingCore import vtkPointPicker
 from vtkmodules.vtkInteractionWidgets import (
     vtkImplicitCylinderRepresentation,
     vtkBoxRepresentation,
@@ -189,6 +190,9 @@ class FullInstrumentViewWindow(QMainWindow):
         self._reset_projection.setToolTip("Resets the projection to default.")
         self._reset_projection.clicked.connect(self.reset_camera)
         self._clear_point_picked_detectors = QPushButton("Clear Mouse Picking")
+        self._select_single_pixel = QPushButton("Select Single Pixel")
+        self._select_single_pixel.setCheckable(True)
+        self._select_single_pixel.setToolTip("Use mouse hover to preview a single detector spectrum (2D projections only).")
         self._aspect_ratio_check_box = QCheckBox()
         self._aspect_ratio_check_box.setText("Maintain Aspect Ratio")
         self._aspect_ratio_check_box.setToolTip(
@@ -202,6 +206,7 @@ class FullInstrumentViewWindow(QMainWindow):
         projection_layout.addWidget(self._projection_combo_box)
         projection_layout.addWidget(self._reset_projection)
         projection_layout.addWidget(self._clear_point_picked_detectors)
+        projection_layout.addWidget(self._select_single_pixel)
         projection_layout.addWidget(self._aspect_ratio_check_box)
         projection_layout.addWidget(self._show_monitors_check_box)
 
@@ -304,6 +309,9 @@ class FullInstrumentViewWindow(QMainWindow):
         self.interactor_style = CustomInteractorStyleZoomAndSelect()
         self._overlay_meshes = []
         self._lineplot_overlays = []
+        self._single_pixel_line = None
+        self._hover_point_picker = vtkPointPicker()
+        self._hover_pick_observer_id = None
 
         screen_geometry = self.screen().geometry()
         self.resize(int(screen_geometry.width() * 0.8), int(screen_geometry.height() * 0.8))
@@ -481,6 +489,7 @@ class FullInstrumentViewWindow(QMainWindow):
     def setup_connections_to_presenter(self) -> None:
         self._projection_combo_box.currentIndexChanged.connect(self._presenter.update_plotter)
         self._clear_point_picked_detectors.clicked.connect(self._presenter.on_clear_point_picked_detectors_clicked)
+        self._select_single_pixel.toggled.connect(self._presenter.on_select_single_pixel_toggled)
         self._contour_range_slider.sliderReleased.connect(self._presenter.on_contour_limits_updated)
         self._contour_range_reset.clicked.connect(self._presenter.on_contour_range_reset_clicked)
         self._integration_limit_slider.sliderReleased.connect(self._presenter.on_integration_limits_updated)
@@ -552,10 +561,44 @@ class FullInstrumentViewWindow(QMainWindow):
                 btn.setDisabled(checked)
 
     def enable_or_disable_mask_widgets(self):
+        if self.is_select_single_pixel_checked():
+            for btn in self._shape_buttons:
+                if btn.isChecked():
+                    btn.toggle()
+                btn.setDisabled(True)
+            self._add_mask.setDisabled(True)
+            self._add_selection.setDisabled(True)
+            return
+
         for btn in self._shape_buttons:
             if btn.isChecked():
                 btn.toggle()
             btn.setDisabled(self.current_selected_projection() == ProjectionType.THREE_D)
+
+    def set_single_pixel_mode_enabled(self, enabled: bool) -> None:
+        if enabled:
+            self.delete_current_widget()
+
+        self._clear_point_picked_detectors.setDisabled(enabled)
+        self._add_mask.setDisabled(True)
+        self._add_selection.setDisabled(True)
+        self._sum_spectra_checkbox.setDisabled(enabled)
+
+        for btn in self._shape_buttons:
+            if btn.isChecked():
+                btn.toggle()
+            btn.setDisabled(enabled or self.current_selected_projection() == ProjectionType.THREE_D)
+
+    def set_select_single_pixel_available(self, is_available: bool) -> None:
+        self._select_single_pixel.setEnabled(is_available)
+
+    def set_select_single_pixel_checked(self, checked: bool) -> None:
+        old_state = self._select_single_pixel.blockSignals(True)
+        self._select_single_pixel.setChecked(checked)
+        self._select_single_pixel.blockSignals(old_state)
+
+    def is_select_single_pixel_checked(self) -> bool:
+        return self._select_single_pixel.isChecked()
 
     def delete_current_widget(self):
         # Should delete widgets explicitly, otherwise not garbage collected
@@ -697,6 +740,7 @@ class FullInstrumentViewWindow(QMainWindow):
     def closeEvent(self, QCloseEvent: QEvent) -> None:
         """When closing, make sure to close the plotters and figure correctly to prevent errors"""
         super().closeEvent(QCloseEvent)
+        self.disable_hover_point_picking()
         with suppress(TypeError):
             self._contour_range_max_edit.disconnect()
             self._contour_range_min_edit.disconnect()
@@ -877,6 +921,7 @@ class FullInstrumentViewWindow(QMainWindow):
 
     def enable_point_picking(self, is_projection: bool, callback: Callable) -> None:
         """Switch on point picking, i.e. picking a single point with right-click"""
+        self.disable_hover_point_picking()
         self.main_plotter.disable_picking()
         # NOTE: Need to remove interactor to avoid artifacts in 2D or 3D
         self.interactor_style.remove_interactor()
@@ -895,6 +940,34 @@ class FullInstrumentViewWindow(QMainWindow):
                 picker="point",
                 tolerance=picking_tolerance,
             )
+
+    def enable_hover_point_picking(self, callback: Callable[[int | None], None]) -> None:
+        """Switch on detector hover picking and call callback with the hovered point index."""
+        self.disable_hover_point_picking()
+        self.main_plotter.disable_picking()
+        self.interactor_style.remove_interactor()
+        if self.main_plotter.off_screen:
+            return
+
+        self.main_plotter.enable_zoom_style()
+        interactor = self.main_plotter.iren.interactor
+        renderer = self.main_plotter.renderer
+
+        def _on_mouse_move(_obj, _event):
+            x, y = interactor.GetEventPosition()
+            self._hover_point_picker.Pick(x, y, 0, renderer)
+            point_id = self._hover_point_picker.GetPointId()
+            callback(point_id if point_id >= 0 else None)
+
+        self._hover_pick_observer_id = interactor.AddObserver("MouseMoveEvent", _on_mouse_move)
+
+    def disable_hover_point_picking(self) -> None:
+        if self._hover_pick_observer_id is None or self.main_plotter.off_screen:
+            return
+
+        interactor = self.main_plotter.iren.interactor
+        interactor.RemoveObserver(self._hover_pick_observer_id)
+        self._hover_pick_observer_id = None
 
     def enable_rectangle_picking(self, is_projection: bool, callback: Callable) -> None:
         """Switch on rectangle picking, i.e. draw a rectangle to select all detectors within the rectangle"""
@@ -925,6 +998,7 @@ class FullInstrumentViewWindow(QMainWindow):
 
     def show_plot_for_detectors(self, workspace: Workspace2D) -> None:
         """Plot all the given spectra, where they are defined by their workspace indices, not the spectra numbers"""
+        self._single_pixel_line = None
         self._detector_spectrum_axes.clear()
         sum_spectra = self.sum_spectra_selected()
         if workspace is not None and workspace.getNumberHistograms() > 0:
@@ -938,6 +1012,20 @@ class FullInstrumentViewWindow(QMainWindow):
             integration_limits = self._presenter.integration_limits_in_current_unit()
             self._detector_spectrum_axes.set_xlim(integration_limits[0], integration_limits[1])
 
+        self.redraw_lineplot()
+
+    def show_single_detector_spectrum(self, x: np.ndarray, y: np.ndarray, label: str, unit: str) -> None:
+        if self._single_pixel_line is None:
+            self._detector_spectrum_axes.clear()
+            (self._single_pixel_line,) = self._detector_spectrum_axes.plot(x, y)
+        else:
+            self._single_pixel_line.set_data(x, y)
+
+        self._single_pixel_line.set_label(label)
+        self._detector_spectrum_axes.set_title(label)
+        self._detector_spectrum_axes.set_xlabel(unit)
+        self._detector_spectrum_axes.relim()
+        self._detector_spectrum_axes.autoscale_view()
         self.redraw_lineplot()
 
     def set_selected_detector_info(self, detector_infos: list[DetectorInfo]) -> None:
