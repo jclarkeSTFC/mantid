@@ -4,6 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
+from contextlib import suppress
 from typing import Callable, Optional
 
 import numpy as np
@@ -24,6 +25,10 @@ class PointCloudRenderer(InstrumentRenderer):
     _DETECTOR_POINT_SIZE = 15
     _PICKABLE_POINT_SIZE = 30
     _MASKED_COLOUR = (0.25, 0.25, 0.25)
+
+    def __init__(self):
+        self._hover_observer_style = None
+        self._hover_observer_tag = None
 
     # ------------------------------------------------------------------ build
     def build_detector_mesh(self, positions: np.ndarray, flip_z: bool, model=None) -> pv.PolyData:
@@ -103,6 +108,37 @@ class PointCloudRenderer(InstrumentRenderer):
 
         # Register callback for left button press
         plotter.iren.style.AddObserver("LeftButtonPressEvent", _on_left_button_press)
+
+    def enable_hover_picking(self, plotter: BackgroundPlotter, callback: Callable[[int], None]) -> None:
+        """Register a mouse-move observer that fires *callback* with the local detector index under the cursor."""
+        self.disable_hover_picking(plotter)
+
+        if plotter.off_screen:
+            return
+
+        picking_tolerance = 0.01
+        picker = vtkPointPicker()
+        picker.SetTolerance(picking_tolerance)
+        interactor = plotter.iren
+
+        def _on_mouse_move(obj, event):
+            x, y = interactor.get_event_position()
+            if picker.Pick(x, y, 0, plotter.renderer) > 0:
+                point_id = picker.GetPointId()
+                if point_id >= 0:
+                    callback(point_id)
+
+        style = plotter.iren.style
+        self._hover_observer_style = style
+        self._hover_observer_tag = style.AddObserver("MouseMoveEvent", _on_mouse_move)
+
+    def disable_hover_picking(self, plotter: BackgroundPlotter) -> None:
+        """Remove any registered hover-pick mouse-move observer."""
+        if self._hover_observer_style is not None and self._hover_observer_tag is not None:
+            with suppress(Exception):
+                self._hover_observer_style.RemoveObserver(self._hover_observer_tag)
+        self._hover_observer_style = None
+        self._hover_observer_tag = None
 
     # -------------------------------------------------------------- scalars
     def set_detector_scalars(self, mesh: pv.PolyData, counts: np.ndarray, label: str) -> None:

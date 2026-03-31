@@ -463,6 +463,69 @@ class TestFullInstrumentViewModel(unittest.TestCase):
         model.save_line_plot_workspace_to_ads()
         mock_ads.addOrReplace.assert_called_once()
 
+    def test_workspace_index_for_pickable_index_valid(self):
+        """workspace_index_for_pickable_index returns the correct workspace index for a valid local index."""
+        model, mock_workspace = self._setup_model([1, 2, 3])
+        model.setup()
+        pickable = np.where(model.is_pickable)[0]
+        self.assertGreater(len(pickable), 0)
+        result = model.workspace_index_for_pickable_index(0)
+        expected = int(model._workspace_indices[model.is_pickable][0])
+        self.assertEqual(result, expected)
+
+    def test_workspace_index_for_pickable_index_out_of_range(self):
+        """workspace_index_for_pickable_index returns None for an out-of-range local index."""
+        model, _ = self._setup_model([1, 2, 3])
+        model.setup()
+        result = model.workspace_index_for_pickable_index(99999)
+        self.assertIsNone(result)
+
+    @mock.patch("instrumentview.FullInstrumentViewModel.ExtractSpectra")
+    @mock.patch("instrumentview.FullInstrumentViewModel.ConvertUnits")
+    def test_extract_spectrum_for_hover_first_call_uses_algorithms(self, mock_convert_units, mock_extract_spectra):
+        """On the first call, extract_spectrum_for_hover initialises the workspace via algorithms."""
+        model, mock_workspace = self._setup_model([1, 2, 3])
+        model.extract_spectrum_for_hover(2, "TOF")
+        mock_extract_spectra.assert_called_once_with(
+            InputWorkspace=mock_workspace, WorkspaceIndexList=[2], EnableLogging=False, StoreInADS=False
+        )
+        mock_convert_units.assert_called_once_with(
+            InputWorkspace=mock_extract_spectra.return_value, target="TOF", EMode="Elastic", EnableLogging=False, StoreInADS=False
+        )
+        self.assertEqual(model.line_plot_workspace, mock_convert_units.return_value)
+
+    @mock.patch("instrumentview.FullInstrumentViewModel.ExtractSpectra")
+    @mock.patch("instrumentview.FullInstrumentViewModel.ConvertUnits")
+    def test_extract_spectrum_for_hover_subsequent_call_in_place(self, mock_convert_units, mock_extract_spectra):
+        """Subsequent calls (same unit, same bin count) update the workspace in-place without algorithm calls."""
+        model, mock_workspace = self._setup_model([1, 2, 3])
+
+        # Supply a mock hover workspace that has the same blocksize so the in-place path is taken
+        hover_ws = MagicMock()
+        hover_ws.blocksize.return_value = mock_workspace.blocksize.return_value
+        model._hover_line_plot_workspace = hover_ws
+        model._hover_line_plot_unit = "TOF"
+
+        # Simulate what the real workspace returns for readY, readE, readX, getSpectrum
+        mock_workspace.readY.return_value = np.array([1.0, 2.0])
+        mock_workspace.readE.return_value = np.array([0.1, 0.2])
+        mock_workspace.readX.return_value = np.array([0.5, 1.5, 2.5])
+        mock_spectrum = MagicMock()
+        mock_spectrum.getSpectrumNo.return_value = 42
+        mock_workspace.getSpectrum.return_value = mock_spectrum
+
+        model.extract_spectrum_for_hover(2, "TOF")
+
+        # No algorithm calls on the fast path
+        mock_extract_spectra.assert_not_called()
+        mock_convert_units.assert_not_called()
+
+        # Y and E were written in-place
+        hover_ws.dataY.assert_called_with(0)
+        hover_ws.dataE.assert_called_with(0)
+
+        self.assertEqual(model.line_plot_workspace, hover_ws)
+
     def test_has_no_unit(self):
         model, mock_workspace = self._setup_model([1, 2, 3])
         mock_workspace.getAxis.return_value = MagicMock()

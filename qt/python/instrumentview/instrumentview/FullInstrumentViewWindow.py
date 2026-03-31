@@ -214,9 +214,18 @@ class FullInstrumentViewWindow(QMainWindow):
             "If checked, detectors are drawn using their actual geometric shapes "
             "(cuboids, cylinders, etc.) instead of points. May be slower for large instruments."
         )
+        self._hover_pick_button = QPushButton("Hover Pick")
+        self._hover_pick_button.setCheckable(True)
+        self._hover_pick_button.setToolTip(
+            "When enabled, the line plot will update in real time with the spectrum "
+            "of the detector under the mouse cursor. Left-click picking and Sum Spectra "
+            "are disabled while this mode is active."
+        )
+
         projection_first_row.addWidget(self._projection_combo_box)
         projection_first_row.addWidget(self._reset_projection)
         projection_first_row.addWidget(self._clear_point_picked_detectors)
+        projection_first_row.addWidget(self._hover_pick_button)
         projection_second_row.addWidget(self._aspect_ratio_check_box)
         projection_second_row.addWidget(self._show_monitors_check_box)
         projection_second_row.addWidget(self._count_scale_combo_box)
@@ -576,6 +585,7 @@ class FullInstrumentViewWindow(QMainWindow):
         self._flip_z_axis_check_box.clicked.connect(self._presenter.on_flip_z_axis_check_box_clicked)
         self._show_shapes_check_box.clicked.connect(self._presenter.on_show_shapes_toggled)
         self._select_bank_tube.toggled.connect(self._presenter.on_select_bank_tube_toggled)
+        self._hover_pick_button.toggled.connect(self._presenter.on_hover_pick_toggled)
 
         self._add_connections_to_edits_and_slider(
             self._contour_range_min_edit,
@@ -743,6 +753,12 @@ class FullInstrumentViewWindow(QMainWindow):
 
     def sum_spectra_selected(self) -> bool:
         return self._sum_spectra_checkbox.isChecked()
+
+    def hover_pick_enabled(self) -> bool:
+        return self._hover_pick_button.isChecked()
+
+    def set_sum_spectra_enabled(self, enabled: bool) -> None:
+        self._sum_spectra_checkbox.setEnabled(enabled)
 
     def get_integration_limits(self) -> tuple[float, float]:
         return self._integration_limit_slider.value()

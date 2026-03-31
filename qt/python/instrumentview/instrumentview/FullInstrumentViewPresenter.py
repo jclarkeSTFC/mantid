@@ -82,6 +82,8 @@ class FullInstrumentViewPresenter:
         self._sbs_shape_renderer = SideBySideShapeRenderer(self._model.workspace)
         self._renderer = self._point_cloud_renderer
         self._select_bank_tube = False
+        self._hover_pick_active = False
+        self._last_hover_point_id = -1
         self.setup()
         self._callback_queue = Queue()
         self._callback_stop_sentinel = object()
@@ -161,9 +163,18 @@ class FullInstrumentViewPresenter:
 
     def integration_limits_in_current_unit(self) -> tuple[float, float]:
         limits = self._model.integration_limits
-        min_in_workspace_unit = self._model.convert_units(self._model.workspace_x_unit, self._view.current_selected_unit(), 0, limits[0])
-        max_in_workspace_unit = self._model.convert_units(self._model.workspace_x_unit, self._view.current_selected_unit(), 0, limits[1])
-        return min_in_workspace_unit, max_in_workspace_unit
+        source = self._model.workspace_x_unit
+        target = self._view.current_selected_unit()
+        if len(self._model.picked_spectrum_nos) > 0:
+            min_val = self._model.convert_units(source, target, 0, limits[0])
+            max_val = self._model.convert_units(source, target, 0, limits[1])
+        else:
+            # No permanently picked detectors (e.g. during hover pick) — use the
+            # hovered detector as context, or the first pickable one if none yet.
+            local_idx = max(0, self._last_hover_point_id)
+            min_val = self._model.convert_units_for_local_index(source, target, local_idx, limits[0])
+            max_val = self._model.convert_units_for_local_index(source, target, local_idx, limits[1])
+        return min_val, max_val
 
     def on_integration_limits_updated(self) -> None:
         """When integration limits are changed, read the new limits and tell the presenter to update the colours accordingly"""
@@ -225,6 +236,7 @@ class FullInstrumentViewPresenter:
         with SuppressRendering(self._view.main_plotter):
             self._update_view_main_plotter()
             self.update_detector_picker()
+            self.update_hover_picker()
             self.on_peaks_workspace_selected()
 
     def count_scale_combo_options(self) -> list[str]:
@@ -357,6 +369,8 @@ class FullInstrumentViewPresenter:
 
     def update_detector_picker(self) -> None:
         def detector_picked(detector_index: int) -> None:
+            if self._hover_pick_active:
+                return
             self._model.update_point_picked_detectors(detector_index, self._select_bank_tube)
             self.update_picked_detectors_on_view()
 
@@ -369,6 +383,33 @@ class FullInstrumentViewPresenter:
         self._peak_interaction_status = PeakInteractionStatus.Disabled
         self._view.remove_peak_cursor_from_lineplot()
         self._update_peak_buttons()
+
+    def update_hover_picker(self) -> None:
+        """Re-register the hover-pick observer after a plotter rebuild, if hover pick is active."""
+        if self._hover_pick_active:
+            self._renderer.enable_hover_picking(self._view.main_plotter, callback=self._on_hover_detected)
+
+    def on_hover_pick_toggled(self, checked: bool) -> None:
+        self._hover_pick_active = checked
+        self._view.set_sum_spectra_enabled(not checked)
+        if checked:
+            self._last_hover_point_id = -1
+            self._renderer.enable_hover_picking(self._view.main_plotter, callback=self._on_hover_detected)
+        else:
+            self._renderer.disable_hover_picking(self._view.main_plotter)
+            self._last_hover_point_id = -1
+            self._update_line_plot_ws_and_draw(self._view.current_selected_unit())
+
+    def _on_hover_detected(self, detector_index: int) -> None:
+        """Called by the hover-pick observer each time the mouse moves over a new detector."""
+        if detector_index == self._last_hover_point_id:
+            return
+        self._last_hover_point_id = detector_index
+        ws_index = self._model.workspace_index_for_pickable_index(detector_index)
+        if ws_index is None:
+            return
+        self._model.extract_spectrum_for_hover(ws_index, self._view.current_selected_unit())
+        self._view.show_plot_for_detectors(self._model.line_plot_workspace)
 
     def _on_clear_point_picked_detectors_clicked(self) -> None:
         self._model.clear_point_picked_detectors()

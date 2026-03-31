@@ -132,6 +132,78 @@ class TestFullInstrumentViewPresenter(unittest.TestCase):
         self._presenter.on_sum_spectra_checkbox_clicked()
         mock_update_line_plot_ws_and_draw.assert_called_once_with("dSpacing")
 
+    def test_on_hover_pick_toggled_enabled(self):
+        self._mock_view.current_selected_unit.return_value = "TOF"
+        self._mock_view.main_plotter.off_screen = False
+        self._presenter.on_hover_pick_toggled(True)
+        self.assertTrue(self._presenter._hover_pick_active)
+        self._mock_view.set_sum_spectra_enabled.assert_called_once_with(False)
+        self._presenter._renderer.enable_hover_picking.assert_called_once_with(
+            self._mock_view.main_plotter, callback=self._presenter._on_hover_detected
+        )
+
+    @mock.patch("instrumentview.FullInstrumentViewPresenter.FullInstrumentViewPresenter._update_line_plot_ws_and_draw")
+    def test_on_hover_pick_toggled_disabled(self, mock_update_line_plot):
+        self._mock_view.current_selected_unit.return_value = "TOF"
+        self._presenter._hover_pick_active = True
+        self._presenter.on_hover_pick_toggled(False)
+        self.assertFalse(self._presenter._hover_pick_active)
+        self._mock_view.set_sum_spectra_enabled.assert_called_once_with(True)
+        self._presenter._renderer.disable_hover_picking.assert_called_once_with(self._mock_view.main_plotter)
+        mock_update_line_plot.assert_called_once_with("TOF")
+
+    @mock.patch("instrumentview.FullInstrumentViewPresenter.FullInstrumentViewPresenter._update_line_plot_ws_and_draw")
+    def test_on_hover_pick_toggled_disabled_resets_last_hover_id(self, _mock):
+        self._presenter._last_hover_point_id = 5
+        self._presenter.on_hover_pick_toggled(False)
+        self.assertEqual(self._presenter._last_hover_point_id, -1)
+
+    def test_click_suppressed_during_hover_pick(self):
+        """detector_picked callback does nothing when hover pick is active."""
+        self._presenter._hover_pick_active = True
+        with mock.patch.object(self._model, "update_point_picked_detectors") as mock_update:
+            # Simulate what enable_picking does: extract the inner closure and call it
+            self._presenter.update_detector_picker()
+            captured_callback = self._presenter._renderer.enable_picking.call_args[1]["callback"]
+            captured_callback(0)
+            mock_update.assert_not_called()
+
+    @mock.patch("instrumentview.FullInstrumentViewPresenter.FullInstrumentViewPresenter._update_line_plot_ws_and_draw")
+    def test_on_hover_detected_same_id_no_extract(self, _mock_update):
+        """_on_hover_detected does nothing if the detector index has not changed."""
+        self._presenter._last_hover_point_id = 3
+        with mock.patch.object(self._model, "extract_spectrum_for_hover") as mock_extract:
+            self._presenter._on_hover_detected(3)
+            mock_extract.assert_not_called()
+
+    def test_on_hover_detected_new_id_updates_plot(self):
+        """_on_hover_detected extracts spectrum and updates plot for a new detector index."""
+        self._presenter._last_hover_point_id = -1
+        self._mock_view.current_selected_unit.return_value = "TOF"
+        self._model._workspace_indices = np.concatenate([np.arange(self._model._workspace_indices.shape[0])])
+        with (
+            mock.patch.object(self._model, "extract_spectrum_for_hover") as mock_extract,
+            mock.patch.object(self._model, "workspace_index_for_pickable_index", return_value=5),
+        ):
+            self._presenter._on_hover_detected(0)
+            mock_extract.assert_called_once_with(5, "TOF")
+            self._mock_view.show_plot_for_detectors.assert_called_once_with(self._model.line_plot_workspace)
+        self.assertEqual(self._presenter._last_hover_point_id, 0)
+
+    def test_update_hover_picker_active(self):
+        """update_hover_picker registers the observer when hover pick is active."""
+        self._presenter._hover_pick_active = True
+        self._presenter.update_hover_picker()
+        self._presenter._renderer.enable_hover_picking.assert_called_once_with(
+            self._mock_view.main_plotter, callback=self._presenter._on_hover_detected
+        )
+
+    def test_update_hover_picker_inactive(self):
+        """update_hover_picker does nothing when hover pick is inactive."""
+        self._presenter._hover_pick_active = False
+        self._presenter.update_hover_picker()
+        self._presenter._renderer.enable_hover_picking.assert_not_called()
+
     @mock.patch.object(FullInstrumentViewModel, "has_unit", new_callable=mock.PropertyMock)
     def test_available_units_no_units(self, mock_has_unit):
         mock_has_unit.return_value = False

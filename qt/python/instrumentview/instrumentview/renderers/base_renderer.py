@@ -128,6 +128,17 @@ class InstrumentRenderer(ABC):
         plotter.view_xy()
         plotter.enable_parallel_projection()
 
+    def enable_hover_picking(self, plotter: BackgroundPlotter, callback: Callable[[int], None]) -> None:
+        """Register a mouse-move observer that fires *callback* with the detector index under the cursor.
+
+        Calling this method a second time replaces (not duplicates) the existing observer.
+        The default implementation is a no-op so that subclasses that do not support picking
+        (e.g. off-screen renderers) inherit safely.
+        """
+
+    def disable_hover_picking(self, plotter: BackgroundPlotter) -> None:
+        """Remove any previously registered hover-pick observer from *plotter*."""
+
     def set_interactive_style(self, plotter, is_projection):
         if not is_projection:
             plotter.iren.style = SwappedButtonTrackballCamera()

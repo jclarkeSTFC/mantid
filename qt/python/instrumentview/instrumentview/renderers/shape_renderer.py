@@ -58,6 +58,9 @@ class ShapeRenderer(InstrumentRenderer):
         self._faces_per_detector: np.ndarray | None = None  # (N,)
         # Reference to the most recently built detector surface mesh
         self._detector_mesh_ref: pv.PolyData | None = None
+        # Hover-pick observer state
+        self._hover_observer_style = None
+        self._hover_observer_tag = None
 
     # -----------------------------------------------------------------
     # Pre-computation: fetch shape meshes and detector transforms once
@@ -251,6 +254,41 @@ class ShapeRenderer(InstrumentRenderer):
 
         # Register callback for left button press
         plotter.iren.style.AddObserver("LeftButtonPressEvent", _on_left_button_press)
+
+    def enable_hover_picking(self, plotter: BackgroundPlotter, callback: Callable[[int], None]) -> None:
+        """Register a mouse-move observer that fires *callback* with the local detector index under the cursor."""
+        self.disable_hover_picking(plotter)
+
+        if plotter.off_screen:
+            return
+
+        c2d = self._cell_to_detector
+        picker = vtkCellPicker()
+        picker.SetTolerance(self._PICKING_TOLERANCE)
+        interactor = plotter.iren
+
+        def _on_mouse_move(obj, event):
+            if c2d is None:
+                return
+            x, y = interactor.get_event_position()
+            if picker.Pick(x, y, 0, plotter.renderer) > 0:
+                cell_id = picker.GetCellId()
+                if cell_id >= 0:
+                    callback(int(c2d[cell_id]))
+
+        style = plotter.iren.style
+        self._hover_observer_style = style
+        self._hover_observer_tag = style.AddObserver("MouseMoveEvent", _on_mouse_move)
+
+    def disable_hover_picking(self, plotter: BackgroundPlotter) -> None:
+        """Remove any registered hover-pick mouse-move observer."""
+        if self._hover_observer_style is not None and self._hover_observer_tag is not None:
+            from contextlib import suppress
+
+            with suppress(Exception):
+                self._hover_observer_style.RemoveObserver(self._hover_observer_tag)
+        self._hover_observer_style = None
+        self._hover_observer_tag = None
 
     def set_detector_scalars(self, mesh: pv.PolyData, counts: np.ndarray, label: str) -> None:
         if self._cell_to_detector is not None and len(counts) > 0:

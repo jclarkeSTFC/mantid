@@ -36,6 +36,7 @@ from mantid.simpleapi import (
 from mantid.api import MatrixWorkspace
 from itertools import groupby
 from pathlib import Path
+from typing import Optional
 import numpy as np
 
 
@@ -116,6 +117,11 @@ class FullInstrumentViewModel:
         # Update counts with default total range
         self.update_integration_range(self._integration_limits, True)
         self.full_counts_limits = self._counts_limits
+
+        # Hover-pick cache: reset on each workspace (re)load
+        self._hover_line_plot_workspace = None
+        self._hover_line_plot_unit = None
+        self._hover_common_bins = self._workspace.isCommonBins()
 
     @property
     def workspace(self) -> Workspace2D:
@@ -409,6 +415,65 @@ class FullInstrumentViewModel:
             self._calculate_projection()
             projection = self._cached_projection_objects.get(cache_key)
         return projection
+
+    def workspace_index_for_pickable_index(self, local_index: int) -> Optional[int]:
+        """Return the workspace index for the detector at *local_index* within the pickable detector array.
+
+        Returns ``None`` if *local_index* is out of range (e.g. the plotter has been rebuilt since
+        the hover observer was registered).
+        """
+        pickable_ws_indices = self._workspace_indices[self.is_pickable]
+        if local_index < 0 or local_index >= len(pickable_ws_indices):
+            return None
+        return int(pickable_ws_indices[local_index])
+
+    def _init_hover_workspace(self, ws_index: int, unit: str) -> None:
+        """Run algorithms once to create the reusable single-spectrum hover workspace."""
+        ws = ExtractSpectra(InputWorkspace=self._workspace, WorkspaceIndexList=[ws_index], EnableLogging=False, StoreInADS=False)
+        if self.has_unit and unit != self.workspace_x_unit:
+            ws = ConvertUnits(InputWorkspace=ws, target=unit, EMode="Elastic", EnableLogging=False, StoreInADS=False)
+        self._hover_line_plot_workspace = ws
+        self._hover_line_plot_unit = unit
+
+    def extract_spectrum_for_hover(self, ws_index: int, unit: str) -> None:
+        """Update the line-plot workspace for hover-pick mode.
+
+        On the first call (or after a unit change or bin-count mismatch), the
+        workspace is built via algorithms.  On every subsequent call, only the
+        Y, E, X, and spectrum-number arrays are updated in-place — no algorithm
+        overhead.
+        """
+        need_init = (
+            self._hover_line_plot_workspace is None
+            or unit != self._hover_line_plot_unit
+            or len(self._workspace.readY(ws_index)) != self._hover_line_plot_workspace.blocksize()
+        )
+        if need_init:
+            self._init_hover_workspace(ws_index, unit)
+            self.line_plot_workspace = self._hover_line_plot_workspace
+            return
+
+        # Fast in-place update — no algorithm calls
+        self._hover_line_plot_workspace.dataY(0)[:] = self._workspace.readY(ws_index)
+        self._hover_line_plot_workspace.dataE(0)[:] = self._workspace.readE(ws_index)
+
+        # Update spectrum number so the plot label is correct
+        spec_no = int(self._workspace.getSpectrum(ws_index).getSpectrumNo())
+        self._hover_line_plot_workspace.getSpectrum(0).setSpectrumNo(spec_no)
+
+        # Update X bins
+        if not self.has_unit or unit == self.workspace_x_unit:
+            # No unit conversion — skip X copy entirely when all spectra share the same bins
+            if not self._hover_common_bins:
+                self._hover_line_plot_workspace.dataX(0)[:] = self._workspace.readX(ws_index)
+        else:
+            # Convert X bins directly using the unit converter (no algorithm call)
+            det_id = int(self._workspace.getSpectrum(ws_index).getDetectorIDs()[0])
+            src_x = self._workspace.readX(ws_index)
+            converted_x = np.array([self._unit_converter.convert(self.workspace_x_unit, unit, spec_no, det_id, xi) for xi in src_x])
+            self._hover_line_plot_workspace.dataX(0)[:] = converted_x
+
+        self.line_plot_workspace = self._hover_line_plot_workspace
 
     def extract_spectra_for_line_plot(self, unit: str, sum_spectra: bool) -> None:
         workspace_indices = self.picked_workspace_indices
@@ -730,6 +795,17 @@ class FullInstrumentViewModel:
             self.picked_detector_ids[picked_detector_index],
             value,
         )
+
+    def convert_units_for_local_index(self, source_unit: str, target_unit: str, local_index: int, value: float) -> float:
+        """Convert *value* using the pickable detector at *local_index* as the geometric context.
+
+        Unlike :meth:`convert_units`, this does not rely on any detector being permanently
+        picked, making it safe to call in hover-pick mode.
+        """
+        pickable_spectrum_nos = self._spectrum_nos[self.is_pickable]
+        pickable_detector_ids = self._detector_ids[self.is_pickable]
+        idx = max(0, min(local_index, len(pickable_spectrum_nos) - 1))
+        return self._unit_converter.convert(source_unit, target_unit, pickable_spectrum_nos[idx], pickable_detector_ids[idx], value)
 
     @property
     def bank_groups_by_detector_id(self) -> list[tuple[list[int], str]] | None:
