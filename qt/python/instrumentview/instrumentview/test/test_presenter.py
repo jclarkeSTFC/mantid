@@ -758,6 +758,16 @@ class TestFullInstrumentViewPresenter(unittest.TestCase):
         self.assertIs(shape_renderer1, shape_renderer2)
         self.assertEqual(mock_update_plotter.call_count, 3)
 
+    def test_on_show_shapes_toggled_stores_draw_shapes_option_when_enabled(self):
+        """Test that on_show_shapes_toggled calls store_draw_shapes_option on the view when checked."""
+        self._presenter.on_show_shapes_toggled(True)
+        self._mock_view.store_draw_shapes_option.assert_called_once()
+
+    def test_on_show_shapes_toggled_stores_draw_shapes_option_when_disabled(self):
+        """Test that on_show_shapes_toggled calls store_draw_shapes_option on the view when unchecked."""
+        self._presenter.on_show_shapes_toggled(False)
+        self._mock_view.store_draw_shapes_option.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
