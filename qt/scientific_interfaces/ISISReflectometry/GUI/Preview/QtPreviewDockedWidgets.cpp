@@ -15,7 +15,6 @@
 #include <QAction>
 #include <QMainWindow>
 #include <QMenu>
-#include <QVBoxLayout>
 
 using namespace Mantid::Kernel;
 using MantidQt::MantidWidgets::IPlotView;
