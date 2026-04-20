@@ -60,7 +60,6 @@ public:
   bool getSymlogEnabled() const override;
 
   QLayout *getRegionSelectorLayout() const override;
-  QLayout *getInstViewLayout() override;
   MantidQt::MantidWidgets::IPlotView *getLinePlotView() const override;
 
 private:

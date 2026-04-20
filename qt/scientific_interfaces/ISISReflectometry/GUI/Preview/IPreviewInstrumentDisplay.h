@@ -8,7 +8,6 @@
 
 #include "MantidAPI/MatrixWorkspace_fwd.h"
 #include "MantidGeometry/IDTypes.h"
-#include "MantidKernel/V3D.h"
 
 #include <QLayout>
 #include <cstddef>
@@ -23,7 +22,6 @@ public:
   virtual void updateWorkspace(Mantid::API::MatrixWorkspace_sptr &workspace) = 0;
   virtual void resetInstView() = 0;
   virtual void plotInstView() = 0;
-  virtual QLayout *getInstViewLayout() = 0;
   virtual void setInstViewZoomMode() = 0;
   virtual void setInstViewEditMode() = 0;
   virtual void setInstViewSelectRectMode() = 0;

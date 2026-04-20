@@ -126,8 +126,6 @@ void QtPreviewDockedWidgets::plotInstView() { m_instDisplay->plotInstView(); }
 
 QLayout *QtPreviewDockedWidgets::getRegionSelectorLayout() const { return m_ui.rs_plot_layout; }
 
-QLayout *QtPreviewDockedWidgets::getInstViewLayout() { return m_instDisplay->getInstViewLayout(); }
-
 IPlotView *QtPreviewDockedWidgets::getLinePlotView() const { return m_ui.line_plot; }
 
 void QtPreviewDockedWidgets::setInstViewZoomState(bool isChecked) { m_ui.iv_zoom_button->setDown(isChecked); }

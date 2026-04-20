@@ -22,7 +22,6 @@ public:
   MOCK_METHOD(void, updateWorkspace, (Mantid::API::MatrixWorkspace_sptr &), (override));
   MOCK_METHOD(void, resetInstView, (), (override));
   MOCK_METHOD(void, plotInstView, (), (override));
-  MOCK_METHOD(QLayout *, getInstViewLayout, (), (override));
   MOCK_METHOD(void, setInstViewZoomMode, (), (override));
   MOCK_METHOD(void, setInstViewEditMode, (), (override));
   MOCK_METHOD(void, setInstViewSelectRectMode, (), (override));

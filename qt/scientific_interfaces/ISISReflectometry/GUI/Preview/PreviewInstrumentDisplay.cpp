@@ -47,15 +47,6 @@ void PreviewInstrumentDisplay::plotInstView() {
   connectSurfaceSignals();
 }
 
-QLayout *PreviewInstrumentDisplay::getInstViewLayout() {
-  disconnectSurfaceSignals();
-  m_instDisplay.reset();
-  if (!m_placeholder->layout()) {
-    new QVBoxLayout(m_placeholder);
-  }
-  return m_placeholder->layout();
-}
-
 void PreviewInstrumentDisplay::setInstViewZoomMode() {
   if (m_instDisplay)
     if (auto surface = m_instDisplay->getSurface())

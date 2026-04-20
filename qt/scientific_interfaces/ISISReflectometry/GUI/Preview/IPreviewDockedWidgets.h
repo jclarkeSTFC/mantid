@@ -69,7 +69,6 @@ public:
   virtual bool getSymlogEnabled() const = 0;
 
   virtual QLayout *getRegionSelectorLayout() const = 0;
-  virtual QLayout *getInstViewLayout() = 0;
   virtual MantidQt::MantidWidgets::IPlotView *getLinePlotView() const = 0;
 };
 } // namespace MantidQt::CustomInterfaces::ISISReflectometry

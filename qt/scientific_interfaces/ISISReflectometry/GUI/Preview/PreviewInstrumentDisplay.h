@@ -29,7 +29,6 @@ public:
   void updateWorkspace(Mantid::API::MatrixWorkspace_sptr &workspace) override;
   void resetInstView() override;
   void plotInstView() override;
-  QLayout *getInstViewLayout() override;
   void setInstViewZoomMode() override;
   void setInstViewEditMode() override;
   void setInstViewSelectRectMode() override;

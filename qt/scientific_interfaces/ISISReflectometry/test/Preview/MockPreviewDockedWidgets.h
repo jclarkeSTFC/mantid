@@ -38,7 +38,6 @@ public:
   MOCK_METHOD(double, getLinthresh, (), (const, override));
   MOCK_METHOD(bool, getSymlogEnabled, (), (const, override));
   MOCK_METHOD(QLayout *, getRegionSelectorLayout, (), (const, override));
-  MOCK_METHOD(QLayout *, getInstViewLayout, (), (override));
   MOCK_METHOD(MantidQt::MantidWidgets::IPlotView *, getLinePlotView, (), (const, override));
 };
 } // namespace MantidQt::CustomInterfaces::ISISReflectometry
