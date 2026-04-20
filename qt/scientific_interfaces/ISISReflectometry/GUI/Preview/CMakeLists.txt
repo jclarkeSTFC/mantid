@@ -1,5 +1,6 @@
 set(PREVIEW_SRC_FILES
     InstViewModel.cpp
+    PreviewPythonInstrumentView.cpp
     PreviewJobManager.cpp
     PreviewPresenter.cpp
     QtPreviewView.cpp
@@ -14,6 +15,8 @@ set(PREVIEW_INC_FILES
     InstViewModel.h
     IInstViewModel.h
     IPreviewModel.h
+    IPreviewPythonInstrumentView.h
+    PreviewPythonInstrumentView.h
     PreviewModel.h
     PreviewJobManager.h
     IPreviewPresenter.h
