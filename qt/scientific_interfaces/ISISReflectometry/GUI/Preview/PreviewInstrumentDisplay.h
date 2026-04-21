@@ -10,6 +10,7 @@
 #include "IPreviewInstrumentDisplay.h"
 #include "InstViewModel.h"
 #include "MantidQtWidgets/InstrumentView/InstrumentDisplay.h"
+#include "MantidQtWidgets/InstrumentView/ProjectionSurface.h"
 
 #include <QMetaObject>
 #include <functional>
@@ -44,6 +45,7 @@ private:
 
   void disconnectSurfaceSignals();
   void connectSurfaceSignals();
+  MantidQt::MantidWidgets::ProjectionSurface_sptr getSurface();
 };
 
 } // namespace MantidQt::CustomInterfaces::ISISReflectometry

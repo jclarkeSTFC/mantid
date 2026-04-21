@@ -6,7 +6,6 @@
 // SPDX - License - Identifier: GPL - 3.0 +
 #include "PreviewInstrumentDisplay.h"
 #include "MantidQtWidgets/InstrumentView/InstrumentActor.h"
-#include "MantidQtWidgets/InstrumentView/ProjectionSurface.h"
 #include "MantidQtWidgets/InstrumentView/UnwrappedCylinder.h"
 
 #include <QVBoxLayout>
@@ -30,7 +29,6 @@ void PreviewInstrumentDisplay::updateWorkspace(Mantid::API::MatrixWorkspace_sptr
 
 void PreviewInstrumentDisplay::resetInstView() {
   disconnectSurfaceSignals();
-  m_instDisplay = nullptr;
   m_instDisplay = std::make_unique<MantidWidgets::InstrumentDisplay>(m_placeholder);
 }
 
@@ -48,23 +46,23 @@ void PreviewInstrumentDisplay::plotInstView() {
 }
 
 void PreviewInstrumentDisplay::setInstViewZoomMode() {
-  if (m_instDisplay)
-    if (auto surface = m_instDisplay->getSurface())
-      surface->setInteractionMode(ProjectionSurface::MoveMode);
+  auto surface = getSurface();
+  if (surface)
+    surface->setInteractionMode(ProjectionSurface::MoveMode);
 }
 
 void PreviewInstrumentDisplay::setInstViewEditMode() {
-  if (m_instDisplay)
-    if (auto surface = m_instDisplay->getSurface())
-      surface->setInteractionMode(ProjectionSurface::EditShapeMode);
+  auto surface = getSurface();
+  if (surface)
+    surface->setInteractionMode(ProjectionSurface::EditShapeMode);
 }
 
 void PreviewInstrumentDisplay::setInstViewSelectRectMode() {
-  if (m_instDisplay)
-    if (auto surface = m_instDisplay->getSurface()) {
-      surface->setInteractionMode(ProjectionSurface::EditShapeMode);
-      surface->startCreatingShape2D("rectangle", Qt::green, QColor(255, 255, 255, 80));
-    }
+  auto surface = getSurface();
+  if (surface) {
+    surface->setInteractionMode(ProjectionSurface::EditShapeMode);
+    surface->startCreatingShape2D("rectangle", Qt::green, QColor(255, 255, 255, 80));
+  }
 }
 
 std::vector<size_t> PreviewInstrumentDisplay::getSelectedDetectors() const {
@@ -87,9 +85,7 @@ void PreviewInstrumentDisplay::disconnectSurfaceSignals() {
 }
 
 void PreviewInstrumentDisplay::connectSurfaceSignals() {
-  if (!m_instDisplay)
-    return;
-  auto surface = m_instDisplay->getSurface();
+  auto surface = getSurface();
   if (!surface)
     return;
   auto callback = [this]() {
@@ -102,6 +98,12 @@ void PreviewInstrumentDisplay::connectSurfaceSignals() {
       QObject::connect(surface.get(), &ProjectionSurface::shapesRemoved, m_placeholder, callback));
   m_surfaceConnections.push_back(
       QObject::connect(surface.get(), &ProjectionSurface::shapesCleared, m_placeholder, callback));
+}
+
+MantidQt::MantidWidgets::ProjectionSurface_sptr PreviewInstrumentDisplay::getSurface() {
+  if (!m_instDisplay)
+    return nullptr;
+  return m_instDisplay->getSurface();
 }
 
 } // namespace MantidQt::CustomInterfaces::ISISReflectometry
