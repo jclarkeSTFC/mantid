@@ -31,7 +31,8 @@ Mantid::Kernel::Logger g_log("PreviewPythonInstrumentView");
 
 Python::Object presenterModule() {
   GlobalInterpreterLock lock;
-  return Python::Object{Python::NewRef(PyImport_ImportModule("instrumentview.ReflectometryInstrumentViewPresenter"))};
+  return Python::Object{
+      Python::NewRef(PyImport_ImportModule("instrumentview.isisreflectometry.ReflectometryInstrumentViewPresenter"))};
 }
 
 Python::Object newPresenter() {

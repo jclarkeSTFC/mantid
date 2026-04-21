@@ -6,7 +6,7 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 
 from instrumentview.FullInstrumentViewModel import FullInstrumentViewModel
-from instrumentview.ReflectometryInstrumentViewView import ReflectometryInstrumentViewView
+from instrumentview.isisreflectometry.ReflectometryInstrumentViewView import ReflectometryInstrumentViewView
 from instrumentview.renderers.shape_renderer import ShapeRenderer
 
 
