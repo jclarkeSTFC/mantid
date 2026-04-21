@@ -32,7 +32,7 @@ ISIS Reflectometry interface.
 class MANTIDQT_ISISREFLECTOMETRY_DLL QtPreviewDockedWidgets final : public QMainWindow, public IPreviewDockedWidgets {
   Q_OBJECT
 public:
-  QtPreviewDockedWidgets(QWidget *parent = nullptr, QLayout *layout = nullptr);
+  QtPreviewDockedWidgets(QWidget *parent = nullptr, QLayout *layout = nullptr, bool useNewInstrumentView = false);
 
   void subscribe(PreviewDockedWidgetsSubscriber *notifyee) noexcept override;
 

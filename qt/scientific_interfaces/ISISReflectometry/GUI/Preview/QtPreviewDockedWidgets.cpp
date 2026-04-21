@@ -10,6 +10,7 @@
 #include "MantidQtIcons/Icon.h"
 #include "MantidQtWidgets/Plotting/PreviewPlot.h"
 #include "QtPreviewInstrumentDisplay.h"
+#include "PreviewPythonInstrumentView.h"
 #include "ROIType.h"
 
 #include <QAction>
@@ -20,15 +21,19 @@ using namespace Mantid::Kernel;
 using MantidQt::MantidWidgets::IPlotView;
 
 namespace MantidQt::CustomInterfaces::ISISReflectometry {
-QtPreviewDockedWidgets::QtPreviewDockedWidgets(QWidget *parent, QLayout *layout)
+QtPreviewDockedWidgets::QtPreviewDockedWidgets(QWidget *parent, QLayout *layout, bool useNewInstrumentView)
     : QMainWindow(parent), m_layout(layout) {
   QMainWindow::setWindowFlags(Qt::Widget);
   setDockOptions(QMainWindow::AnimatedDocks);
   m_ui.setupUi(this);
   m_layout->addWidget(this);
 
-  m_instDisplay = std::make_unique<QtPreviewInstrumentDisplay>(
-      m_ui.iv_placeholder, [this]() { onInstViewShapeChanged(); }, std::make_unique<InstViewModel>());
+  if (useNewInstrumentView) {
+    m_instDisplay = std::make_unique<PreviewPythonInstrumentView>(m_ui.iv_placeholder->layout());
+  } else {
+    m_instDisplay = std::make_unique<QtPreviewInstrumentDisplay>(
+        m_ui.iv_placeholder, [this]() { onInstViewShapeChanged(); }, std::make_unique<InstViewModel>());
+  }
   loadToolbarIcons();
   setupSelectRegionTypes();
   connectSignals();
