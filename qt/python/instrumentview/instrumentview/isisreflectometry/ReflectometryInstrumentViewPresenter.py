@@ -8,6 +8,10 @@
 from instrumentview.FullInstrumentViewModel import FullInstrumentViewModel
 from instrumentview.isisreflectometry.ReflectometryInstrumentViewView import ReflectometryInstrumentViewView
 from instrumentview.renderers.shape_renderer import ShapeRenderer
+from instrumentview.Projections.ProjectionType import ProjectionType
+import numpy as np
+from vtk import vtkCoordinate
+from typing import Optional
 
 
 class ReflectometryInstrumentViewPresenter:
@@ -22,15 +26,16 @@ class ReflectometryInstrumentViewPresenter:
     _COUNTS_LABEL = "Integrated Counts"
     _VISIBLE_LABEL = "Visible Picked"
 
-    def __init__(self, view=None):
+    def __init__(self, view: Optional[ReflectometryInstrumentViewView] = None):
         self.view = view or ReflectometryInstrumentViewView()
-        self._model = None
+        self._model: Optional[FullInstrumentViewModel] = None
 
     def update_workspace(self, workspace):
         """Set up the model from the workspace and render the instrument."""
         self.view.initialise()
         self._model = FullInstrumentViewModel(workspace)
         self._model.setup()
+        self._model.projection_type = ProjectionType.CYLINDRICAL_Y
         self._renderer = ShapeRenderer(workspace)
         self._renderer.precompute()
         self._render()
@@ -85,13 +90,16 @@ class ReflectometryInstrumentViewPresenter:
 
     def _render(self):
         """Render the instrument into the view's plotter."""
+        if self._model is None:
+            return
+
         plotter = self.view.main_plotter
         plotter.clear()
 
-        det_mesh = self._renderer.build_detector_mesh(self._model.detector_positions, self._model.flip_z, self._model)
-        self._renderer.set_detector_scalars(det_mesh, self._model.detector_counts, self._COUNTS_LABEL)
+        self._detector_mesh = self._renderer.build_detector_mesh(self._model.detector_positions, self._model.flip_z, self._model)
+        self._renderer.set_detector_scalars(self._detector_mesh, self._model.detector_counts, self._COUNTS_LABEL)
         self._renderer.add_detector_mesh_to_plotter(
-            plotter, det_mesh, is_projection=self._model.is_2d_projection, scalars=self._COUNTS_LABEL
+            plotter, self._detector_mesh, is_projection=self._model.is_2d_projection, scalars=self._COUNTS_LABEL
         )
 
         pick_mesh = self._renderer.build_pickable_mesh(self._model.detector_positions, self._model.flip_z)
@@ -101,6 +109,42 @@ class ReflectometryInstrumentViewPresenter:
         mask_mesh = self._renderer.build_masked_mesh(self._model.masked_positions, self._model.flip_z, self._model)
         self._renderer.add_masked_mesh_to_plotter(plotter, mask_mesh)
 
+        self._transform = self._transform_mesh_to_fill_window()
+        self._detector_mesh.transform(self._transform, inplace=True)
+        pick_mesh.transform(self._transform, inplace=True)
+
         self._renderer.set_parallel_view(plotter)
         plotter.reset_camera()
         self._renderer.set_interactive_style(plotter, self._model.is_2d_projection)
+
+    def _transform_mesh_to_fill_window(self) -> np.ndarray:
+        xmin, xmax, ymin, ymax, zmin, zmax = self._detector_mesh.bounds
+        min_point = np.array([xmin, ymin, zmin])
+        max_point = np.array([xmax, ymax, zmax])
+
+        # Convert to display coordinates (pixels)
+        plotter = self.view.main_plotter
+        coordinate = vtkCoordinate()
+        coordinate.SetCoordinateSystemToWorld()
+        display_coords = []
+        for p in (min_point, max_point):
+            coordinate.SetValue(*p)
+            display_coords.append(coordinate.GetComputedDisplayValue(plotter.renderer))
+
+        mesh_width = display_coords[1][0] - display_coords[0][0]
+        mesh_height = display_coords[1][1] - display_coords[0][1]
+
+        window_width, window_height = plotter.window_size
+
+        # Safeguard against division by zero
+        mesh_width = mesh_width if mesh_width > 0 else window_width
+        mesh_height = mesh_height if mesh_height > 0 else window_height
+
+        return self._scale_matrix_relative_to_centre((min_point + max_point) / 2, window_width / mesh_width, window_height / mesh_height)
+
+    @staticmethod
+    def _scale_matrix_relative_to_centre(centre, scale_x=1.0, scale_y=1.0) -> np.ndarray:
+        # Translate to centre, scale, translate back
+        # The matrix below is the product of those three transformations
+        c_x, c_y, _ = centre
+        return np.array([[scale_x, 0, 0, c_x * (1 - scale_x)], [0, scale_y, 0, c_y * (1 - scale_y)], [0, 0, 1, 0], [0, 0, 0, 1]])
