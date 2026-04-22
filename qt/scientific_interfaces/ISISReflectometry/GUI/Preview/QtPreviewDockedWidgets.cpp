@@ -16,6 +16,7 @@
 #include <QAction>
 #include <QMainWindow>
 #include <QMenu>
+#include <QVBoxLayout>
 
 using namespace Mantid::Kernel;
 using MantidQt::MantidWidgets::IPlotView;
@@ -29,6 +30,7 @@ QtPreviewDockedWidgets::QtPreviewDockedWidgets(QWidget *parent, QLayout *layout,
   m_layout->addWidget(this);
 
   if (useNewInstrumentView) {
+    m_ui.iv_placeholder->setLayout(new QVBoxLayout(m_ui.iv_placeholder));
     m_instDisplay = std::make_unique<PreviewPythonInstrumentView>(m_ui.iv_placeholder->layout());
   } else {
     m_instDisplay = std::make_unique<PreviewInstrumentDisplay>(
