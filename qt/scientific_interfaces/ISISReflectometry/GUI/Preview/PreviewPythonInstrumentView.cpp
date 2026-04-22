@@ -22,6 +22,7 @@
 #include <boost/python/stl_iterator.hpp>
 
 using Mantid::API::MatrixWorkspace_sptr;
+using Mantid::API::Workspace_sptr;
 using Mantid::PythonInterface::GlobalInterpreterLock;
 using Mantid::PythonInterface::PythonException;
 using namespace MantidQt::Widgets::Common;
@@ -100,7 +101,12 @@ void PreviewPythonInstrumentView::setLayout(QLayout *layout) {
 void PreviewPythonInstrumentView::updateWorkspace(MatrixWorkspace_sptr &workspace) {
   try {
     GlobalInterpreterLock lock;
-    pyobj().attr("update_workspace")(workspace);
+    Workspace_sptr workspace2d = std::dynamic_pointer_cast<Mantid::API::Workspace>(workspace);
+    if (!workspace2d) {
+      g_log.error("Failed to update instrument view because the provided workspace is not a 2D workspace");
+      return;
+    }
+    pyobj().attr("update_workspace")(workspace2d);
   } catch (boost::python::error_already_set &) {
     g_log.error() << PythonException(true).what() << "\n";
   }
