@@ -75,8 +75,7 @@ std::vector<Mantid::detid_t> QtPreviewInstrumentDisplay::getSelectedDetectorIDs(
   return result;
 }
 
-std::vector<Mantid::detid_t>
-QtPreviewInstrumentDisplay::detIndicesToDetIDs(std::vector<size_t> const &detIndices) const {
+std::vector<Mantid::detid_t> QtPreviewInstrumentDisplay::detIndicesToDetIDs(std::vector<size_t> const &detIndices) const {
   return m_instViewModel->detIndicesToDetIDs(detIndices);
 }
 
