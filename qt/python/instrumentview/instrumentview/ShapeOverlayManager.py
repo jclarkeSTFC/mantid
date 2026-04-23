@@ -54,10 +54,17 @@ class ShapeOverlayManager:
         # Populated on the main thread by project_and_cache_points(),
         # consumed once by get_shape_mask().
         self._cached_projected_points = None  # np.ndarray | None
+        # Optional zero-argument callable invoked after every interactive
+        # shape update (drag / resize / rotate). Set via set_on_shape_changed().
+        self._on_shape_changed = None
 
     @property
     def current_shape(self) -> SelectionShape | None:
         return self._shape
+
+    def set_on_shape_changed(self, callback) -> None:
+        """Register a zero-argument callable fired after every interactive shape update."""
+        self._on_shape_changed = callback
 
     def _ensure_chart(self):
         if self._chart is not None:
@@ -328,6 +335,11 @@ class ShapeOverlayManager:
                 self._state[_STATE_MODE] = None
                 self._state.pop(_STATE_RESIZE_WHICH, None)
                 self._state[_STATE_ACTIVE_SHAPE] = None
+                if self._on_shape_changed is not None:
+                    try:
+                        self._on_shape_changed()
+                    except Exception as ex:
+                        logger.debug(f"Exception in on_shape_changed callback: {ex}")
         except Exception as ex:
             logger.debug(f"Exception in shape left-release handler: {ex}")
 

@@ -205,7 +205,7 @@ void PreviewPresenter::notifyInstViewShapeChanged() {
   notifyInstViewEditRequested();
   // Get the masked workspace indices
   std::optional<ProcessingInstructions> detIDs = std::nullopt;
-  auto indices = m_dockedWidgets->detIndicesToDetIDs(m_dockedWidgets->getSelectedDetectors());
+  auto indices = m_dockedWidgets->getSelectedDetectorIDs();
   if (indices.size() > 0) {
     auto detIDsStr = Mantid::Kernel::Strings::joinCompress(indices.cbegin(), indices.cend(), ",");
     detIDs = ProcessingInstructions{detIDsStr};
@@ -337,7 +337,7 @@ void PreviewPresenter::runSumBanks(bool const addExistingROIsToPlot) {
 
   auto const &expSettingsDetectorROI = m_mainPresenter->getMatchingROIDetectorIDsForPreviewRow();
   if (m_plotExistingROIs) {
-    auto const selectedDetectorsOnPlot = m_dockedWidgets->getSelectedDetectors();
+    auto const selectedDetectorsOnPlot = m_dockedWidgets->getSelectedDetectorIDs();
     if (selectedDetectorsOnPlot.empty()) {
       // Update the model with any detector ROIs from the experiment settings.
       // At the moment we only plot existing ROIs on the slice viewer plot, not the instrument view plot.

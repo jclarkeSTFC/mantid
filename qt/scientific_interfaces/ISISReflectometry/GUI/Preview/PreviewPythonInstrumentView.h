@@ -10,6 +10,8 @@
 #include "MantidAPI/MatrixWorkspace_fwd.h"
 #include "MantidGeometry/IDTypes.h"
 #include "MantidQtWidgets/Common/Python/Object.h"
+#include "ShapeChangedRelay.h"
+#include <functional>
 
 using namespace MantidQt::Widgets::Common;
 
@@ -27,18 +29,20 @@ public:
   void close() override;
   void setLayout(QLayout *layout) override;
 
+  void setShapeChangedCallback(std::function<void()> callback);
+
   void updateWorkspace(Mantid::API::MatrixWorkspace_sptr &workspace) override;
   void resetInstView() override;
   void plotInstView() override;
   void setInstViewZoomMode() override;
   void setInstViewEditMode() override;
   void setInstViewSelectRectMode() override;
-  std::vector<size_t> getSelectedDetectors() const override;
-  std::vector<Mantid::detid_t> detIndicesToDetIDs(std::vector<size_t> const &detIndices) const override;
+  std::vector<Mantid::detid_t> getSelectedDetectorIDs() const override;
 
 private:
   Python::Object getView() const;
 
   QLayout *m_layout;
+  std::unique_ptr<ShapeChangedRelay> m_relay;
 };
 } // namespace MantidQt::CustomInterfaces::ISISReflectometry

@@ -28,9 +28,10 @@ set(PREVIEW_INC_FILES
     PreviewInstrumentDisplay.h
     ROIType.h
     QtPreviewView.h
+    ShapeChangedRelay.h
 )
 
-set(PREVIEW_MOC_FILES QtPreviewView.h QtPreviewDockedWidgets.h)
+set(PREVIEW_MOC_FILES QtPreviewView.h QtPreviewDockedWidgets.h ShapeChangedRelay.h)
 
 set(PREVIEW_UI_FILES PreviewWidget.ui PreviewDockedWidgets.ui)
 

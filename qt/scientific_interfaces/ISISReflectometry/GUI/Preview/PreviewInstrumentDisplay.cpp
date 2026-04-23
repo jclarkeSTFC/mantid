@@ -65,16 +65,15 @@ void PreviewInstrumentDisplay::setInstViewSelectRectMode() {
   }
 }
 
-std::vector<size_t> PreviewInstrumentDisplay::getSelectedDetectors() const {
-  std::vector<size_t> result;
+std::vector<Mantid::detid_t> PreviewInstrumentDisplay::getSelectedDetectorIDs() const {
+  std::vector<Mantid::detid_t> result;
   if (m_instDisplay)
-    if (auto surface = m_instDisplay->getSurface())
-      surface->getMaskedDetectors(result);
+    if (auto surface = m_instDisplay->getSurface()) {
+      std::vector<size_t> detIndices;
+      surface->getMaskedDetectors(detIndices);
+      result = m_instViewModel->detIndicesToDetIDs(detIndices);
+    }
   return result;
-}
-
-std::vector<Mantid::detid_t> PreviewInstrumentDisplay::detIndicesToDetIDs(std::vector<size_t> const &detIndices) const {
-  return m_instViewModel->detIndicesToDetIDs(detIndices);
 }
 
 void PreviewInstrumentDisplay::disconnectSurfaceSignals() {

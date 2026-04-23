@@ -15,6 +15,7 @@
 #include "MantidPythonInterface/core/WrapPython.h"
 #include "MantidQtWidgets/Common/Python/Object.h"
 #include "MantidQtWidgets/Common/Python/Sip.h"
+#include "ShapeChangedRelay.h"
 
 #include <QWidget>
 #include <boost/python/extract.hpp>
@@ -52,6 +53,8 @@ PreviewPythonInstrumentView::PreviewPythonInstrumentView(QLayout *layout)
     if (m_layout) {
       auto view = Python::extract<QWidget>(getView());
       m_layout->addWidget(view);
+      m_relay = std::make_unique<ShapeChangedRelay>(view);
+      m_relay->setObjectName("ShapeChangedRelay");
     }
   } catch (boost::python::error_already_set &) {
     g_log.error() << PythonException(true).what() << "\n";
@@ -65,6 +68,11 @@ PreviewPythonInstrumentView &PreviewPythonInstrumentView::operator=(PreviewPytho
 Python::Object PreviewPythonInstrumentView::getView() const {
   GlobalInterpreterLock lock;
   return pyobj().attr("view");
+}
+
+void PreviewPythonInstrumentView::setShapeChangedCallback(std::function<void()> callback) {
+  if (m_relay)
+    m_relay->setCallback(std::move(callback));
 }
 
 void PreviewPythonInstrumentView::show() {
@@ -157,27 +165,10 @@ void PreviewPythonInstrumentView::setInstViewSelectRectMode() {
   }
 }
 
-std::vector<size_t> PreviewPythonInstrumentView::getSelectedDetectors() const {
+std::vector<Mantid::detid_t> PreviewPythonInstrumentView::getSelectedDetectorIDs() const {
   try {
     GlobalInterpreterLock lock;
-    boost::python::object result = pyobj().attr("get_selected_detectors")();
-    boost::python::stl_input_iterator<size_t> begin(result), end;
-    return std::vector<size_t>(begin, end);
-  } catch (boost::python::error_already_set &) {
-    g_log.error() << PythonException(true).what() << "\n";
-    return {};
-  }
-}
-
-std::vector<Mantid::detid_t>
-PreviewPythonInstrumentView::detIndicesToDetIDs(std::vector<size_t> const &detIndices) const {
-  try {
-    GlobalInterpreterLock lock;
-    boost::python::list pyIndices;
-    for (auto const &idx : detIndices) {
-      pyIndices.append(idx);
-    }
-    boost::python::object result = pyobj().attr("det_indices_to_det_ids")(pyIndices);
+    boost::python::object result = pyobj().attr("selected_detector_ids")();
     boost::python::stl_input_iterator<Mantid::detid_t> begin(result), end;
     return std::vector<Mantid::detid_t>(begin, end);
   } catch (boost::python::error_already_set &) {
