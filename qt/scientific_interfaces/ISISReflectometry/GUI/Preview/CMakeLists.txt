@@ -15,7 +15,6 @@ set(PREVIEW_INC_FILES
     InstViewModel.h
     IInstViewModel.h
     IPreviewModel.h
-    IPreviewPythonInstrumentView.h
     PreviewPythonInstrumentView.h
     PreviewModel.h
     PreviewJobManager.h

@@ -61,10 +61,6 @@ class ReflectometryInstrumentViewPresenter:
         if plotter is not None and self._model is not None:
             self._renderer.set_interactive_style(plotter, self._model.is_2d_projection)
 
-    def set_edit_mode(self):
-        """Set the plotter interaction to edit/picking mode."""
-        self.view.remove_shape()
-
     def set_select_rect_mode(self):
         """Set the plotter interaction to rectangle selection mode."""
         plotter = self.view.main_plotter

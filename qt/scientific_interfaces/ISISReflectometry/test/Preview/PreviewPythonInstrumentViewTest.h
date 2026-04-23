@@ -6,8 +6,7 @@
 // SPDX - License - Identifier: GPL - 3.0 +
 #pragma once
 
-#include "MockPreviewPythonInstrumentView.h"
-
+#include "IPreviewInstrumentDisplay.h"
 #include "MantidAPI/MatrixWorkspace.h"
 #include "MantidFrameworkTestHelpers/WorkspaceCreationHelper.h"
 #include "MantidKernel/V3D.h"

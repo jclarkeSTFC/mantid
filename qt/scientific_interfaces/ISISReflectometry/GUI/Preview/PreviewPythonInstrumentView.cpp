@@ -75,24 +75,6 @@ void PreviewPythonInstrumentView::setShapeChangedCallback(std::function<void()> 
     m_relay->setCallback(std::move(callback));
 }
 
-void PreviewPythonInstrumentView::show() {
-  try {
-    GlobalInterpreterLock lock;
-    getView().attr("show")();
-  } catch (boost::python::error_already_set &) {
-    g_log.error() << PythonException(true).what() << "\n";
-  }
-}
-
-void PreviewPythonInstrumentView::close() {
-  try {
-    GlobalInterpreterLock lock;
-    getView().attr("close")();
-  } catch (boost::python::error_already_set &) {
-    g_log.error() << PythonException(true).what() << "\n";
-  }
-}
-
 void PreviewPythonInstrumentView::setLayout(QLayout *layout) {
   if (!layout)
     return;
@@ -142,15 +124,6 @@ void PreviewPythonInstrumentView::setInstViewZoomMode() {
   try {
     GlobalInterpreterLock lock;
     pyobj().attr("set_zoom_mode")();
-  } catch (boost::python::error_already_set &) {
-    g_log.error() << PythonException(true).what() << "\n";
-  }
-}
-
-void PreviewPythonInstrumentView::setInstViewEditMode() {
-  try {
-    GlobalInterpreterLock lock;
-    pyobj().attr("set_edit_mode")();
   } catch (boost::python::error_already_set &) {
     g_log.error() << PythonException(true).what() << "\n";
   }

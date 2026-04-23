@@ -6,7 +6,7 @@
 // SPDX - License - Identifier: GPL - 3.0 +
 #pragma once
 
-#include "IPreviewPythonInstrumentView.h"
+#include "IPreviewInstrumentDisplay.h"
 #include "MantidAPI/MatrixWorkspace_fwd.h"
 #include "MantidGeometry/IDTypes.h"
 #include "MantidQtWidgets/Common/Python/Object.h"
@@ -17,7 +17,7 @@ using namespace MantidQt::Widgets::Common;
 
 namespace MantidQt::CustomInterfaces::ISISReflectometry {
 class MANTIDQT_ISISREFLECTOMETRY_DLL PreviewPythonInstrumentView : public Python::InstanceHolder,
-                                                                   public IPreviewPythonInstrumentView {
+                                                                   public IPreviewInstrumentDisplay {
 public:
   PreviewPythonInstrumentView(QLayout *layout = nullptr);
   PreviewPythonInstrumentView(PreviewPythonInstrumentView const &) = delete;
@@ -25,9 +25,7 @@ public:
   PreviewPythonInstrumentView &operator=(PreviewPythonInstrumentView const &) = delete;
   PreviewPythonInstrumentView &operator=(PreviewPythonInstrumentView &&);
 
-  void show() override;
-  void close() override;
-  void setLayout(QLayout *layout) override;
+  void setLayout(QLayout *layout);
 
   void setShapeChangedCallback(std::function<void()> callback);
 
@@ -35,7 +33,7 @@ public:
   void resetInstView() override;
   void plotInstView() override;
   void setInstViewZoomMode() override;
-  void setInstViewEditMode() override;
+  void setInstViewEditMode() override {};
   void setInstViewSelectRectMode() override;
   std::vector<Mantid::detid_t> getSelectedDetectorIDs() const override;
 
