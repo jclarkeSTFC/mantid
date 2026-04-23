@@ -64,7 +64,7 @@ class ReflectometryInstrumentViewView(QWidget):
         if on_shape_changed is not None:
             self._shape_overlay_manager.set_on_shape_changed(on_shape_changed)
         shape = RectangleSelectionShape(cx=0.5, cy=0.5, half_w=1.0 / 6.0, half_h=1.0 / 6.0)
-        self._shape_overlay_manager.set_shape(shape)
+        self._shape_overlay_manager.add_shape(shape)
 
     def remove_shape(self) -> None:
         """Remove the current selection shape overlay."""
