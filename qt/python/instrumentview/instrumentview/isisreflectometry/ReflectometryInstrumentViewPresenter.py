@@ -9,6 +9,7 @@ from instrumentview.FullInstrumentViewModel import FullInstrumentViewModel
 from instrumentview.isisreflectometry.ReflectometryInstrumentViewView import ReflectometryInstrumentViewView
 from instrumentview.renderers.shape_renderer import ShapeRenderer
 from instrumentview.Projections.ProjectionType import ProjectionType
+from qtpy.QtCore import QObject, QMetaObject, Qt
 import numpy as np
 from vtk import vtkCoordinate
 from typing import Optional
@@ -29,6 +30,8 @@ class ReflectometryInstrumentViewPresenter:
     def __init__(self, view: Optional[ReflectometryInstrumentViewView] = None):
         self.view = view or ReflectometryInstrumentViewView()
         self._model: Optional[FullInstrumentViewModel] = None
+        self._transform: Optional[np.ndarray] = None
+        self._rect_selected_detector_ids: list[int] = []
 
     def update_workspace(self, workspace):
         """Set up the model from the workspace and render the instrument."""
@@ -53,40 +56,48 @@ class ReflectometryInstrumentViewPresenter:
 
     def set_zoom_mode(self):
         """Set the plotter interaction to zoom/pan mode."""
+        self.view.remove_shape()
         plotter = self.view.main_plotter
         if plotter is not None and self._model is not None:
             self._renderer.set_interactive_style(plotter, self._model.is_2d_projection)
 
     def set_edit_mode(self):
         """Set the plotter interaction to edit/picking mode."""
-        plotter = self.view.main_plotter
-        if plotter is not None:
-            self._renderer.enable_picking(plotter, callback=self._on_detector_picked)
+        self.view.remove_shape()
 
     def set_select_rect_mode(self):
         """Set the plotter interaction to rectangle selection mode."""
         plotter = self.view.main_plotter
         if plotter is not None:
-            self.view.set_shape("rectangle")
+            self.view.overlay_rectangle(on_shape_changed=self._on_rect_shape_changed)
 
-    def get_selected_detectors(self):
-        """Return a list of picked detector indices."""
-        if self._model is None:
-            return []
-        return self._model.picked_detector_ids.tolist()
+    def get_rect_selected_detector_ids(self) -> list[int]:
+        """Return the detector IDs currently within the rectangle selection."""
+        return list(self._rect_selected_detector_ids)
 
-    def det_indices_to_det_ids(self, det_indices):
-        """Convert detector indices to detector IDs."""
-        if self._model is None:
-            return []
+    def _on_rect_shape_changed(self) -> None:
+        """Recompute which detectors fall inside the rectangle and store their IDs."""
+        if self._model is None or self._transform is None:
+            return
+        mgr = self.view.shape_overlay_manager
+        if mgr is None:
+            return
+        positions = self._model.detector_positions
+        if len(positions) == 0:
+            self._rect_selected_detector_ids = []
+            return
+        ones = np.ones((len(positions), 1))
+        transformed = (self._transform @ np.hstack([positions, ones]).T).T[:, :3]
+        mask = mgr.get_shape_mask(transformed)
         all_ids = self._model.all_detector_ids
-        return [int(all_ids[i]) for i in det_indices]
+        self._rect_selected_detector_ids = [int(all_ids[i]) for i in np.where(mask)[0]]
 
-    def _on_detector_picked(self, detector_index):
-        """Callback for when a detector is picked."""
-        if self._model is not None:
-            self._model.update_point_picked_detectors(detector_index, expand_to_parent_subtree=False)
-            self._render()
+        relay = self.view.findChild(QObject, "ShapeChangedRelay")
+        if relay is not None:
+            QMetaObject.invokeMethod(relay, "notify", Qt.DirectConnection)
+
+    def selected_detector_ids(self) -> list[int]:
+        return self._rect_selected_detector_ids
 
     def _render(self):
         """Render the instrument into the view's plotter."""
@@ -100,16 +111,8 @@ class ReflectometryInstrumentViewPresenter:
         self._renderer.set_detector_scalars(self._detector_mesh, self._model.detector_counts, self._COUNTS_LABEL)
         self._renderer.add_detector_mesh_to_plotter(plotter, self._detector_mesh, scalars=self._COUNTS_LABEL, show_scalar_bar=False)
 
-        pick_mesh = self._renderer.build_pickable_mesh(self._model.detector_positions, self._model.flip_z)
-        self._renderer.set_pickable_scalars(pick_mesh, self._model.picked_visibility, self._VISIBLE_LABEL)
-        self._renderer.add_pickable_mesh_to_plotter(plotter, pick_mesh, scalars=self._VISIBLE_LABEL)
-
-        mask_mesh = self._renderer.build_masked_mesh(self._model.masked_positions, self._model.flip_z, self._model)
-        self._renderer.add_masked_mesh_to_plotter(plotter, mask_mesh)
-
         self._transform = self._transform_mesh_to_fill_window()
         self._detector_mesh.transform(self._transform, inplace=True)
-        pick_mesh.transform(self._transform, inplace=True)
 
         self._renderer.set_parallel_view(plotter)
         plotter.reset_camera()

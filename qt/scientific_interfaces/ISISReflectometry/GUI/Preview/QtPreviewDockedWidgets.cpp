@@ -9,8 +9,8 @@
 #include "MantidAPI/MatrixWorkspace_fwd.h"
 #include "MantidQtIcons/Icon.h"
 #include "MantidQtWidgets/Plotting/PreviewPlot.h"
-#include "QtPreviewInstrumentDisplay.h"
 #include "PreviewPythonInstrumentView.h"
+#include "QtPreviewInstrumentDisplay.h"
 #include "ROIType.h"
 
 #include <QAction>
@@ -31,7 +31,9 @@ QtPreviewDockedWidgets::QtPreviewDockedWidgets(QWidget *parent, QLayout *layout,
 
   if (useNewInstrumentView) {
     m_ui.iv_placeholder->setLayout(new QVBoxLayout(m_ui.iv_placeholder));
-    m_instDisplay = std::make_unique<PreviewPythonInstrumentView>(m_ui.iv_placeholder->layout());
+    auto pythonInstDisplay = std::make_unique<PreviewPythonInstrumentView>(m_ui.iv_placeholder->layout());
+    pythonInstDisplay->setShapeChangedCallback([this]() { onInstViewShapeChanged(); });
+    m_instDisplay = std::move(pythonInstDisplay);
   } else {
     m_instDisplay = std::make_unique<QtPreviewInstrumentDisplay>(
         m_ui.iv_placeholder, [this]() { onInstViewShapeChanged(); }, std::make_unique<InstViewModel>());
@@ -172,12 +174,8 @@ void QtPreviewDockedWidgets::setEditROIState(bool state) { m_ui.rs_edit_button->
 
 void QtPreviewDockedWidgets::setRectangularROIState(bool state) { m_ui.rs_rect_select_button->setDown(state); }
 
-std::vector<size_t> QtPreviewDockedWidgets::getSelectedDetectors() const {
-  return m_instDisplay->getSelectedDetectors();
-}
-
-std::vector<Mantid::detid_t> QtPreviewDockedWidgets::detIndicesToDetIDs(std::vector<size_t> const &detIndices) const {
-  return m_instDisplay->detIndicesToDetIDs(detIndices);
+std::vector<Mantid::detid_t> QtPreviewDockedWidgets::getSelectedDetectorIDs() const {
+  return m_instDisplay->getSelectedDetectorIDs();
 }
 
 std::string QtPreviewDockedWidgets::getRegionType() const {

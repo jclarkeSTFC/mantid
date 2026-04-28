@@ -64,11 +64,14 @@ void QtPreviewInstrumentDisplay::setInstViewSelectRectMode() {
   }
 }
 
-std::vector<size_t> QtPreviewInstrumentDisplay::getSelectedDetectors() const {
-  std::vector<size_t> result;
+std::vector<Mantid::detid_t> QtPreviewInstrumentDisplay::getSelectedDetectorIDs() const {
+  std::vector<Mantid::detid_t> result;
   if (m_instDisplay)
-    if (auto surface = m_instDisplay->getSurface())
-      surface->getMaskedDetectors(result);
+    if (auto surface = m_instDisplay->getSurface()) {
+      std::vector<size_t> detIndices;
+      surface->getMaskedDetectors(detIndices);
+      result = m_instViewModel->detIndicesToDetIDs(detIndices);
+    }
   return result;
 }
 
