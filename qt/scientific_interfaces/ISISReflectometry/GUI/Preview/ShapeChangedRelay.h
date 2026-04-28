@@ -25,6 +25,7 @@ public:
 
   void setCallback(std::function<void()> callback) { m_callback = std::move(callback); }
 
+  // cppcheck-suppress unknownMacro
 public slots:
   void notify() {
     if (m_callback)
