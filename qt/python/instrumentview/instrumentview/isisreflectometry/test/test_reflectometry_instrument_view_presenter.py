@@ -56,7 +56,6 @@ class TestReflectometryInstrumentViewPresenter(unittest.TestCase):
         mock_model_cls.return_value.detector_counts = np.zeros(10)
         mock_model_cls.return_value.is_2d_projection = True
         mock_renderer_cls.return_value.build_detector_mesh.return_value = MagicMock(bounds=(0, 1, 0, 1, 0, 1), transform=MagicMock())
-        self._presenter._transform_mesh_to_fill_window = MagicMock(return_value=np.eye(4))
         self._presenter.update_workspace(mock_ws)
         self._mock_view.initialise.assert_called_once()
 
@@ -69,7 +68,6 @@ class TestReflectometryInstrumentViewPresenter(unittest.TestCase):
         mock_model_cls.return_value.detector_counts = np.zeros(10)
         mock_model_cls.return_value.is_2d_projection = True
         mock_renderer_cls.return_value.build_detector_mesh.return_value = MagicMock(bounds=(0, 1, 0, 1, 0, 1), transform=MagicMock())
-        self._presenter._transform_mesh_to_fill_window = MagicMock(return_value=np.eye(4))
         self._presenter.update_workspace(mock_ws)
         mock_model_cls.assert_called_once_with(mock_ws)
         self.assertIsNotNone(self._presenter._model)
@@ -83,7 +81,6 @@ class TestReflectometryInstrumentViewPresenter(unittest.TestCase):
         mock_model_cls.return_value.detector_counts = np.zeros(10)
         mock_model_cls.return_value.is_2d_projection = True
         mock_renderer_cls.return_value.build_detector_mesh.return_value = MagicMock(bounds=(0, 1, 0, 1, 0, 1), transform=MagicMock())
-        self._presenter._transform_mesh_to_fill_window = MagicMock(return_value=np.eye(4))
         self._presenter.update_workspace(mock_ws)
         self.assertEqual(mock_model_cls.return_value.projection_type, ProjectionType.CYLINDRICAL_Y)
 
@@ -234,6 +231,57 @@ class TestReflectometryInstrumentViewPresenter(unittest.TestCase):
         called_coords = mock_manager.get_shape_mask.call_args[0][0]
         np.testing.assert_allclose(called_coords[0, :3], [1.0, 2.0, 0.0])
         self.assertEqual(self._presenter._rect_selected_detector_ids, [55])
+
+    def test_render_registers_fill_transform_callback(self):
+        """After _render, the view's resize callback is set to _apply_fill_transform."""
+        self._presenter._model = MagicMock()
+        self._presenter._renderer = MagicMock()
+        self._presenter._renderer.build_detector_mesh.return_value = MagicMock(bounds=(0, 1, 0, 1, 0, 1))
+        self._presenter._render()
+        self._mock_view.set_on_resize_callback.assert_called_once_with(self._presenter._apply_fill_transform)
+
+    def test_apply_fill_transform_scales_mesh_to_fill_viewport(self):
+        """Fill transform should scale mesh so both dimensions fill the viewport."""
+        mesh = MagicMock()
+        mesh.bounds = (0, 2, 0, 1, 0, 0)  # mesh 2 wide, 1 tall
+        self._presenter._detector_mesh = mesh
+        self._presenter._original_mesh_bounds = (0, 2, 0, 1, 0, 0)
+        self._presenter._transform = np.eye(4)
+        self._mock_view.main_plotter.ren_win.GetSize.return_value = (400, 300)
+        # Simulate reset_camera setting parallel_scale = 0.75 for this mesh/viewport
+        self._mock_view.main_plotter.camera.parallel_scale = 0.75
+
+        self._presenter._apply_fill_transform()
+
+        # reset_camera called once (to fit the original mesh before reading parallel_scale)
+        self._mock_view.main_plotter.reset_camera.assert_called_once()
+        # Fill transform applied to mesh
+        mesh.transform.assert_called_once()
+        transform = mesh.transform.call_args[0][0]
+        # parallel_scale=0.75 → visible_height=1.5, visible_width=1.5*(400/300)=2.0
+        # scale_x = 2.0/2 = 1.0, scale_y = 1.5/1 = 1.5
+        np.testing.assert_allclose(transform[0, 0], 1.0, atol=1e-6)
+        np.testing.assert_allclose(transform[1, 1], 1.5, atol=1e-6)
+
+    def test_apply_fill_transform_undoes_previous_transform(self):
+        """A second call should undo the first fill transform before applying a new one."""
+        mesh = MagicMock()
+        self._presenter._detector_mesh = mesh
+        self._presenter._original_mesh_bounds = (0, 2, 0, 1, 0, 0)
+        # Simulate a previously-applied non-identity transform
+        self._presenter._transform = np.diag([2.0, 3.0, 1.0, 1.0])
+        self._mock_view.main_plotter.ren_win.GetSize.return_value = (400, 300)
+        self._mock_view.main_plotter.camera.parallel_scale = 0.75
+
+        self._presenter._apply_fill_transform()
+
+        # First call should be the inverse (undo), second should be the new fill transform
+        self.assertEqual(mesh.transform.call_count, 2)
+
+    def test_reset_clears_resize_callback(self):
+        self._presenter._model = MagicMock()
+        self._presenter.reset()
+        self._mock_view.set_on_resize_callback.assert_called_with(None)
 
     def test_scale_matrix_identity_when_scale_1(self):
         matrix = ReflectometryInstrumentViewPresenter._scale_matrix_relative_to_centre(np.array([0.0, 0.0, 0.0]), scale_x=1.0, scale_y=1.0)

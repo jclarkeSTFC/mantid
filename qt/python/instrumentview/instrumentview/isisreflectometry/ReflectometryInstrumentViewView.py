@@ -9,6 +9,7 @@ import pyvista as pv
 from pyvistaqt import BackgroundPlotter
 
 from qtpy.QtWidgets import QHBoxLayout, QWidget
+from qtpy.QtCore import QTimer
 
 from mantidqt.utils.qt.qappthreadcall import run_on_qapp_thread
 from instrumentview.ShapeOverlayManager import ShapeOverlayManager
@@ -34,6 +35,7 @@ class ReflectometryInstrumentViewView(QWidget):
         self._initialised = False
         self.main_plotter = None
         self._shape_overlay_manager: ShapeOverlayManager | None = None
+        self._on_resize_callback = None
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -50,6 +52,26 @@ class ReflectometryInstrumentViewView(QWidget):
 
         self.main_plotter = BackgroundPlotter(show=False, menu_bar=False, toolbar=False, off_screen=False)
         self.layout().addWidget(self.main_plotter.app_window)
+
+    def set_on_resize_callback(self, callback) -> None:
+        """Set a callable invoked (deferred) on every resize, or None to clear."""
+        self._on_resize_callback = callback
+
+    def resizeEvent(self, event):
+        """Re-fit the camera (and fill transform) when the widget is resized.
+
+        Qt propagates the resize to child widgets synchronously inside
+        super().resizeEvent(), so QVTKRenderWindowInteractor.resizeEvent runs
+        and calls vtkRenderWindow.SetSize(w, h) before we return.  We then
+        defer one event-loop cycle (QTimer.singleShot(0, ...)) so that VTK's
+        own paint cycle completes before we reset the camera or recompute the
+        fill transform against the now-correct render window dimensions.
+        """
+        super().resizeEvent(event)
+        if self.main_plotter is None:
+            return
+        callback = self._on_resize_callback if self._on_resize_callback is not None else self.main_plotter.reset_camera
+        QTimer.singleShot(0, callback)
 
     @property
     def shape_overlay_manager(self) -> ShapeOverlayManager | None:

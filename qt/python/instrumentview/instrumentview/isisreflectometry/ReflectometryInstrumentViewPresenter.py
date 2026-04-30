@@ -11,7 +11,6 @@ from instrumentview.renderers.shape_renderer import ShapeRenderer
 from instrumentview.Projections.ProjectionType import ProjectionType
 from qtpy.QtCore import QObject, QMetaObject, Qt
 import numpy as np
-from vtk import vtkCoordinate
 from typing import Optional
 
 
@@ -31,6 +30,7 @@ class ReflectometryInstrumentViewPresenter:
         self.view = view or ReflectometryInstrumentViewView()
         self._model: Optional[FullInstrumentViewModel] = None
         self._transform: Optional[np.ndarray] = None
+        self._original_mesh_bounds: Optional[tuple] = None
         self._rect_selected_detector_ids: list[int] = []
 
     def update_workspace(self, workspace):
@@ -48,7 +48,9 @@ class ReflectometryInstrumentViewPresenter:
         if self.view.main_plotter is not None:
             self.view.main_plotter.clear()
         self.view.remove_shape()
+        self.view.set_on_resize_callback(None)
         self._transform = None
+        self._original_mesh_bounds = None
         self._rect_selected_detector_ids = []
         self._model = None
 
@@ -110,37 +112,67 @@ class ReflectometryInstrumentViewPresenter:
         self._renderer.set_detector_scalars(self._detector_mesh, self._model.detector_counts, self._COUNTS_LABEL)
         self._renderer.add_detector_mesh_to_plotter(plotter, self._detector_mesh, scalars=self._COUNTS_LABEL, show_scalar_bar=False)
 
-        self._transform = self._transform_mesh_to_fill_window()
-        self._detector_mesh.transform(self._transform, inplace=True)
+        # Store the original (pre-fill-transform) bounds so _apply_fill_transform
+        # can undo/redo the fill when the dock is resized.
+        self._original_mesh_bounds = self._detector_mesh.bounds
+        self._transform = np.eye(4)
 
         self._renderer.set_parallel_view(plotter)
         plotter.reset_camera()
         self._renderer.set_interactive_style(plotter, self._model.is_2d_projection)
 
-    def _transform_mesh_to_fill_window(self) -> np.ndarray:
-        xmin, xmax, ymin, ymax, zmin, zmax = self._detector_mesh.bounds
-        min_point = np.array([xmin, ymin, zmin])
-        max_point = np.array([xmax, ymax, zmax])
+        # Schedule the fill transform via resizeEvent so it runs after Qt/VTK
+        # have applied the correct dock dimensions to the VTK render window.
+        self.view.set_on_resize_callback(self._apply_fill_transform)
 
-        # Convert to display coordinates (pixels)
+    def _apply_fill_transform(self):
+        """Stretch the detector mesh to fill the viewport.
+
+        Called from the view's resizeEvent (deferred by one event-loop cycle so
+        QVTKRenderWindowInteractor.resizeEvent has already updated the VTK
+        render window dimensions via vtkRenderWindow.SetSize).
+        """
+        if self._detector_mesh is None or self._original_mesh_bounds is None:
+            return
         plotter = self.view.main_plotter
-        coordinate = vtkCoordinate()
-        coordinate.SetCoordinateSystemToWorld()
-        display_coords = []
-        for p in (min_point, max_point):
-            coordinate.SetValue(*p)
-            display_coords.append(coordinate.GetComputedDisplayValue(plotter.renderer))
+        if plotter is None:
+            return
 
-        mesh_width = display_coords[1][0] - display_coords[0][0]
-        mesh_height = display_coords[1][1] - display_coords[0][1]
+        w, h = plotter.ren_win.GetSize()
+        if w <= 0 or h <= 0:
+            return
 
-        window_width, window_height = plotter.window_size
+        xmin, xmax, ymin, ymax, zmin, zmax = self._original_mesh_bounds
+        mesh_width = xmax - xmin
+        mesh_height = ymax - ymin
+        if mesh_width <= 0 or mesh_height <= 0:
+            return
 
-        # Safeguard against division by zero
-        mesh_width = mesh_width if mesh_width > 0 else window_width
-        mesh_height = mesh_height if mesh_height > 0 else window_height
+        # Undo any previous fill transform so we work from the original bounds.
+        if not np.allclose(self._transform, np.eye(4)):
+            self._detector_mesh.transform(np.linalg.inv(self._transform), inplace=True)
+            self._transform = np.eye(4)
 
-        return self._scale_matrix_relative_to_centre((min_point + max_point) / 2, window_width / mesh_width, window_height / mesh_height)
+        # Ask VTK to fit the original (untransformed) mesh with the correct
+        # viewport size now in effect.  Read back the actual parallel_scale it
+        # chose — this is the authoritative value regardless of VTK's internal
+        # formula (bounding sphere, padding, etc.).
+        plotter.reset_camera()
+        parallel_scale = plotter.camera.parallel_scale
+
+        # Derive the visible world rectangle from the camera.
+        # In parallel projection: visible_height = 2 * parallel_scale
+        # visible_width = visible_height * (viewport_width / viewport_height)
+        visible_height = 2.0 * parallel_scale
+        visible_width = visible_height * w / h
+
+        # Scale the mesh independently in X and Y so it exactly fills that
+        # rectangle.  Do NOT call reset_camera afterwards — the camera is
+        # already fitted correctly; a second call would refit to the scaled
+        # mesh and might produce a different (wrong) parallel_scale.
+        centre = np.array([(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2])
+        self._transform = self._scale_matrix_relative_to_centre(centre, visible_width / mesh_width, visible_height / mesh_height)
+        self._detector_mesh.transform(self._transform, inplace=True)
 
     @staticmethod
     def _scale_matrix_relative_to_centre(centre, scale_x=1.0, scale_y=1.0) -> np.ndarray:
