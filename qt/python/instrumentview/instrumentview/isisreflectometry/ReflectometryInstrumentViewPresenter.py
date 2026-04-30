@@ -47,6 +47,9 @@ class ReflectometryInstrumentViewPresenter:
         """Clear and re-initialise the view."""
         if self.view.main_plotter is not None:
             self.view.main_plotter.clear()
+        self.view.remove_shape()
+        self._transform = None
+        self._rect_selected_detector_ids = []
         self._model = None
 
     def plot(self):

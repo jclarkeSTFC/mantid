@@ -63,7 +63,6 @@ public:
 
 private:
   Ui::PreviewDockedWidgets m_ui;
-  QLayout *m_layout;
   PreviewDockedWidgetsSubscriber *m_notifyee{nullptr};
   std::unique_ptr<IPreviewInstrumentDisplay> m_instDisplay;
 

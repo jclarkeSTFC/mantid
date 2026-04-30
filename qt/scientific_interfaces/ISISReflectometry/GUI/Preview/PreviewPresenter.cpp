@@ -203,7 +203,6 @@ void PreviewPresenter::notifyInstViewZoomRequested() {
 void PreviewPresenter::notifyInstViewShapeChanged() {
   // Change to shape editing after a selection has been done to match instrument viewer default behaviour
   notifyInstViewEditRequested();
-  // Get the masked workspace indices
   std::optional<ProcessingInstructions> detIDs = std::nullopt;
   auto indices = m_dockedWidgets->getSelectedDetectorIDs();
   if (indices.size() > 0) {

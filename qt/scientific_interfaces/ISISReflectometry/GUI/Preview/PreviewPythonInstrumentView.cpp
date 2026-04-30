@@ -83,6 +83,10 @@ void PreviewPythonInstrumentView::setLayout(QLayout *layout) {
     GlobalInterpreterLock lock;
     auto view = Python::extract<QWidget>(getView());
     m_layout->addWidget(view);
+    if (!m_relay) {
+      m_relay = std::make_unique<ShapeChangedRelay>(view);
+      m_relay->setObjectName("ShapeChangedRelay");
+    }
   } catch (boost::python::error_already_set &) {
     g_log.error() << PythonException(true).what() << "\n";
   }

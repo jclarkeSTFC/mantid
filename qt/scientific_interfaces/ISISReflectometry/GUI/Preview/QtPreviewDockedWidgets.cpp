@@ -23,11 +23,13 @@ using MantidQt::MantidWidgets::IPlotView;
 
 namespace MantidQt::CustomInterfaces::ISISReflectometry {
 QtPreviewDockedWidgets::QtPreviewDockedWidgets(QWidget *parent, QLayout *layout, bool useNewInstrumentView)
-    : QMainWindow(parent), m_layout(layout) {
+    : QMainWindow(parent) {
   QMainWindow::setWindowFlags(Qt::Widget);
   setDockOptions(QMainWindow::AnimatedDocks);
   m_ui.setupUi(this);
-  m_layout->addWidget(this);
+  if (layout) {
+    layout->addWidget(this);
+  }
 
   if (useNewInstrumentView) {
     m_ui.iv_placeholder->setLayout(new QVBoxLayout(m_ui.iv_placeholder));
